@@ -36,6 +36,7 @@ import { inspectRegistrationTimelineFromApi } from "@/services/registrationTimel
 import { type ConnectedWallet } from "@/services/wallet/cip30"
 import { readMidnightWalletDustBalance } from "@/services/wallet/midnightDappConnector"
 import { WalletConnectSection } from "./WalletConnectSection"
+import { FaqPanel } from "./FaqPanel"
 
 type DustGrowthStatus = "unchecked" | "checking" | "growing" | "stable"
 
@@ -552,6 +553,9 @@ export function InspectorApp() {
             )
           )}
         </section>
+
+        {/* 3. FAQ */}
+        <FaqPanel />
 
         {/* Dev: mock scenario */}
         {mockModeEnabled && (
