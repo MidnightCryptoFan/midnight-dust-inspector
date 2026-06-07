@@ -1,5 +1,5 @@
-import { useState } from "react"
-import type { CardanoAccountSnapshot } from "@/domain/cardanoAccount"
+import { useEffect, useState } from "react"
+import type { CardanoAccountSnapshot, VestingSchedule } from "@/domain/cardanoAccount"
 import type { OnChainRegistrationState } from "@/domain/onChainRegistration"
 import type { DustGenerationStatus } from "@/domain/dustStatus"
 import type {
@@ -36,6 +36,7 @@ type NightSummary = {
   lockedTotal: bigint
   atomicUnitsPerNight: bigint
   hasData: boolean
+  vestingSchedule: VestingSchedule | null
 }
 
 type Props = {
@@ -190,11 +191,10 @@ function SummaryTiles({
         valueColor="text-teal-700 dark:text-teal-300"
       />
       {hasVesting && (
-        <MetricTile
-          label="Airdrop Vesting"
-          value={`${formatCompactAtomicQuantity(lockedTotal, atomicUnitsPerNight)} NIGHT`}
-          sub="locked · not counted"
-          valueColor="text-amber-600 dark:text-amber-400"
+        <VestingTile
+          lockedTotal={lockedTotal}
+          atomicUnitsPerNight={atomicUnitsPerNight}
+          vestingSchedule={nightSummary.vestingSchedule}
         />
       )}
       <RegistrationTile effectiveState={effectiveState} />
@@ -222,6 +222,72 @@ function MetricTile({
       <dd className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
         {sub}
       </dd>
+    </div>
+  )
+}
+
+function formatVestingCountdown(diffMs: number): string {
+  const totalMinutes = Math.floor(diffMs / 60_000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return "< 1m"
+}
+
+function VestingTile({
+  lockedTotal,
+  atomicUnitsPerNight,
+  vestingSchedule,
+}: {
+  lockedTotal: bigint
+  atomicUnitsPerNight: bigint
+  vestingSchedule: VestingSchedule | null
+}) {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const amount = `${formatCompactAtomicQuantity(lockedTotal, atomicUnitsPerNight)} NIGHT`
+
+  let sub: string
+  let isClaimable = false
+
+  if (vestingSchedule) {
+    const diffMs = vestingSchedule.nextThawTimestampMs - now
+    isClaimable = diffMs <= 0
+    sub = isClaimable ? "Now" : `thaw in ${formatVestingCountdown(diffMs)}`
+  } else {
+    sub = "not counted"
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        Airdrop Vesting
+      </dt>
+      <dd className="mt-1 text-sm font-semibold text-amber-600 dark:text-amber-400">
+        {amount}
+      </dd>
+      <dd className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{sub}</dd>
+      {isClaimable && (
+        <dd className="mt-1.5">
+          <a
+            href="https://redeem.midnight.gd/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+          >
+            Claim NIGHT now →
+          </a>
+        </dd>
+      )}
     </div>
   )
 }
@@ -975,6 +1041,7 @@ function computeNightSummary(
       lockedTotal: 0n,
       atomicUnitsPerNight: 1_000_000n,
       hasData: false,
+      vestingSchedule: null,
     }
   }
 
@@ -1000,7 +1067,13 @@ function computeNightSummary(
     .filter((u) => isScriptPaymentAddress(u.address))
     .reduce((sum, u) => sum + parseBigInt(u.quantity), 0n)
 
-  return { unlockedTotal, lockedTotal, atomicUnitsPerNight, hasData: true }
+  return {
+    unlockedTotal,
+    lockedTotal,
+    atomicUnitsPerNight,
+    hasData: true,
+    vestingSchedule: snapshot.vestingSchedule,
+  }
 }
 
 function isScriptPaymentAddress(address: string): boolean {

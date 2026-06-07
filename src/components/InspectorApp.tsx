@@ -37,6 +37,7 @@ import { type ConnectedWallet } from "@/services/wallet/cip30"
 import { readMidnightWalletDustBalance } from "@/services/wallet/midnightDappConnector"
 import { WalletConnectSection } from "./WalletConnectSection"
 import { FaqPanel } from "./FaqPanel"
+import { TipPanel } from "./TipPanel"
 
 type DustGrowthStatus = "unchecked" | "checking" | "growing" | "stable"
 
@@ -554,7 +555,10 @@ export function InspectorApp() {
           )}
         </section>
 
-        {/* 3. FAQ */}
+        {/* 3. Tip */}
+        <TipPanel />
+
+        {/* 4. FAQ */}
         <FaqPanel />
 
         {/* Dev: mock scenario */}

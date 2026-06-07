@@ -64,6 +64,7 @@ const cardanoAccountSnapshot: CardanoAccountSnapshot = {
       raw: {},
     },
   ],
+  vestingSchedule: null,
   source: "koios",
   checkedAt: "2026-06-06T00:00:00.000Z",
   raw: {},

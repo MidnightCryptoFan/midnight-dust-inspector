@@ -1,5 +1,11 @@
 import { formatCompactAtomicQuantity } from "@/lib/formatting"
 
+export type VestingSchedule = {
+  nextThawTimestampMs: number
+  thawsCompleted: number
+  intervalMs: number
+}
+
 export const DEFAULT_CARDANO_NIGHT_POLICY_ID =
   "0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa"
 export const DEFAULT_CARDANO_NIGHT_ASSET_NAME = "4e49474854"
@@ -46,6 +52,7 @@ export type CardanoAccountSnapshot = {
   nightBalance: string | null
   nightBalanceDisplay: string | null
   nightUtxos: CardanoNightUtxo[]
+  vestingSchedule: VestingSchedule | null
   source: "koios"
   checkedAt: string
   raw: unknown
@@ -69,6 +76,7 @@ export function buildCardanoAccountSnapshot(input: {
       ? formatCardanoAssetQuantity(nightAsset)
       : null,
     nightUtxos: collectNightUtxos(input.utxos),
+    vestingSchedule: extractVestingSchedule(input.utxos),
     source: input.source,
     checkedAt: input.checkedAt,
     raw: {
@@ -177,6 +185,61 @@ function getCardanoNightAssetName(): string {
   return (
     process.env.CARDANO_NIGHT_ASSET_NAME ?? DEFAULT_CARDANO_NIGHT_ASSET_NAME
   ).toLowerCase()
+}
+
+function extractVestingSchedule(utxos: CardanoUtxo[]): VestingSchedule | null {
+  const nightPolicyId = getCardanoNightPolicyId()
+  const nightAssetName = getCardanoNightAssetName()
+
+  for (const utxo of utxos) {
+    const hasNight = utxo.assetList.some(
+      (asset) =>
+        asset.policyId === nightPolicyId &&
+        asset.assetName.toLowerCase() === nightAssetName,
+    )
+    if (!hasNight) continue
+
+    const raw = utxo.raw as { inline_datum?: { value?: unknown } } | null
+    const schedule = parseVestingDatum(raw?.inline_datum?.value)
+    if (schedule) return schedule
+  }
+  return null
+}
+
+function parseVestingDatum(value: unknown): VestingSchedule | null {
+  try {
+    if (!value || typeof value !== "object") return null
+    const datum = value as { constructor?: number; fields?: unknown[] }
+    if (datum.constructor !== 0 || !Array.isArray(datum.fields)) return null
+    if (datum.fields.length < 5) return null
+
+    const getInt = (field: unknown): number | null => {
+      if (!field || typeof field !== "object") return null
+      const f = field as { int?: unknown }
+      return typeof f.int === "number" ? f.int : null
+    }
+
+    const amountPerThawAtomic = getInt(datum.fields[1])
+    const nextThawTimestampMs = getInt(datum.fields[2])
+    const thawsCompleted = getInt(datum.fields[3])
+    const intervalMs = getInt(datum.fields[4])
+
+    if (
+      amountPerThawAtomic === null ||
+      nextThawTimestampMs === null ||
+      thawsCompleted === null ||
+      intervalMs === null
+    )
+      return null
+
+    return {
+      nextThawTimestampMs,
+      thawsCompleted,
+      intervalMs,
+    }
+  } catch {
+    return null
+  }
 }
 
 function isPositiveIntegerString(value: string | null | undefined): boolean {
