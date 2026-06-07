@@ -14,10 +14,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL ?? "https://midnight-dust-inspector.vercel.app"
+
 export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
   title: "Midnight DUST Inspector",
   description:
-    "Inspect Midnight DUST generation status and review optional wallet-signed registration actions.",
+    "Check your Midnight DUST generation status, NIGHT balance, and registration state. Non-custodial — no seed phrase required.",
+  openGraph: {
+    title: "Midnight DUST Inspector",
+    description:
+      "Check your Midnight DUST generation status, NIGHT balance, and registration state. Non-custodial — no seed phrase required.",
+    url: baseUrl,
+    siteName: "Midnight DUST Inspector",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Midnight DUST Inspector",
+    description:
+      "Check your Midnight DUST generation status, NIGHT balance, and registration state. Non-custodial — no seed phrase required.",
+  },
 }
 
 export default function RootLayout({
