@@ -19,7 +19,7 @@ const baseUrl =
 
 const title = "Midnight DUST Inspector – Check & Manage DUST Generation"
 const description =
-  "Check your Midnight DUST generation status, NIGHT balance, and registration state. Non-custodial — connect your Cardano or Midnight wallet, or just enter a stake address."
+  "Check your Midnight DUST generation status, NIGHT balance, and registration state. Non-custodial — no seed phrase or sign-up required."
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
