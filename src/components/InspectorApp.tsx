@@ -681,7 +681,7 @@ function WorldLabel({ world }: { world: "cardano" | "midnight" }) {
           rel="noopener noreferrer"
           className="text-xs text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
         >
-          ? Help
+          Help?
         </a>
       </div>
     )

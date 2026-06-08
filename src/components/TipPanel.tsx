@@ -31,7 +31,7 @@ export function TipPanel() {
           rel="noopener noreferrer"
           className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
         >
-          ? Help
+          Help?
         </a>
       </div>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">

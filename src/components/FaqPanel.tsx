@@ -72,7 +72,7 @@ export function FaqPanel() {
           rel="noopener noreferrer"
           className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
         >
-          ? More Help
+          Help?
         </a>
       </div>
       <dl className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
