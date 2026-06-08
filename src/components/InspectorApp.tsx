@@ -429,9 +429,19 @@ export function InspectorApp() {
               DUST Dashboard
             </h1>
           </div>
-          <span className="hidden rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 sm:inline-flex dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-            Non-custodial
-          </span>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://midnightcryptofan.github.io/midnight-dust-inspector-help/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-600 hover:bg-violet-100 transition-colors dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-400 dark:hover:bg-violet-950/50"
+            >
+              Get Help
+            </a>
+            <span className="hidden rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 sm:inline-flex dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+              Non-custodial
+            </span>
+          </div>
         </header>
 
         {/* Modals */}
