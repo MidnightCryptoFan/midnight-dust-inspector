@@ -21,9 +21,19 @@ export function TipPanel() {
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-        Support this tool
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Support this tool
+        </h2>
+        <a
+          href="https://midnightcryptofan.github.io/midnight-dust-inspector-help/#support"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        >
+          ? Help
+        </a>
+      </div>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
         This is a free, open-source community tool built and maintained by a
         Midnight community member.

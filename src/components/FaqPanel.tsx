@@ -62,9 +62,19 @@ const faqs: { question: string; answer: string }[] = [
 export function FaqPanel() {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-        Frequently Asked Questions
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          Frequently Asked Questions
+        </h2>
+        <a
+          href="https://midnightcryptofan.github.io/midnight-dust-inspector-help/#faq"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        >
+          ? More Help
+        </a>
+      </div>
       <dl className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
         {faqs.map(({ question, answer }) => (
           <details key={question} className="group py-3">

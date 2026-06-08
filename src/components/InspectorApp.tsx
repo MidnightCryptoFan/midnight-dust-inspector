@@ -665,20 +665,42 @@ async function resolveRegistrationAddress(
   }
 }
 
+const HELP_BASE = "https://midnightcryptofan.github.io/midnight-dust-inspector-help"
+
 function WorldLabel({ world }: { world: "cardano" | "midnight" }) {
   if (world === "cardano") {
     return (
-      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-        <span className="h-2 w-2 rounded-full bg-blue-500" />
-        Cardano
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+          <span className="h-2 w-2 rounded-full bg-blue-500" />
+          Cardano
+        </p>
+        <a
+          href={`${HELP_BASE}/#cardano`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+        >
+          ? Help
+        </a>
+      </div>
     )
   }
   return (
-    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
-      <span className="h-2 w-2 rounded-full bg-violet-500" />
-      Midnight
-    </p>
+    <div className="flex items-center justify-between">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+        <span className="h-2 w-2 rounded-full bg-violet-500" />
+        Midnight
+      </p>
+      <a
+        href={`${HELP_BASE}/#midnight`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-slate-400 hover:text-violet-500 dark:hover:text-violet-400 transition-colors"
+      >
+        ? Help
+      </a>
+    </div>
   )
 }
 
