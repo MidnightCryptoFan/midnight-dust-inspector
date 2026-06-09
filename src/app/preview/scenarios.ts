@@ -124,6 +124,8 @@ function registrationEvent(
     blockTime: d.toISOString(),
     stakeAddress: MOCK_STAKE,
     dustAddress: type === "registration_created" ? MOCK_DUST : null,
+    nightAmount: null,
+    nightDirection: null,
     blockHeight: 10500000 - daysAgo * 720,
     confidence: "high",
     summary:

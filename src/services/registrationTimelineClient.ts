@@ -55,6 +55,7 @@ export async function inspectRegistrationTimeline(
         detailsByTxHash: new Map(
           details.map((detail) => [detail.txHash, detail] as const),
         ),
+        userAddresses: addresses,
         checkedAt,
         source: "koios",
       }),

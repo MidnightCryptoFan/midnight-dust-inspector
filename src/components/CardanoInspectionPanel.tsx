@@ -91,7 +91,9 @@ export function CardanoInspectionPanel({
 
   // Newest first for display (timeline is built oldest-first for count logic).
   const registrationEvents = (
-    timeline?.events.filter((e) => e.type !== "unknown") ?? []
+    timeline?.events.filter(
+      (e) => e.type !== "unknown",
+    ) ?? []
   )
     .slice()
     .reverse()
@@ -152,6 +154,7 @@ export function CardanoInspectionPanel({
           events={registrationEvents}
           effectiveState={effectiveState}
           indexerUtxoTxHash={indexerStatus?.utxoTxHash ?? null}
+          atomicUnitsPerNight={nightSummary.atomicUnitsPerNight}
           referenceTime={
             indexerStatus?.checkedAt ??
             timeline?.checkedAt ??
@@ -754,11 +757,13 @@ function RegistrationEventList({
   events,
   effectiveState,
   indexerUtxoTxHash,
+  atomicUnitsPerNight,
   referenceTime,
 }: {
   events: RegistrationEvent[]
   effectiveState: EffectiveState
   indexerUtxoTxHash: string | null
+  atomicUnitsPerNight: bigint
   referenceTime: string | null
 }) {
   return (
@@ -771,8 +776,8 @@ function RegistrationEventList({
           <RegistrationEventCard
             key={event.txHash}
             event={event}
-            // Only the most recent event (index 0) can be in a sync conflict.
-            // Older events have had enough time to be processed by the indexer.
+            atomicUnitsPerNight={atomicUnitsPerNight}
+            // Only the most recent non-transfer event (index 0) can be in a sync conflict.
             eventWarning={
               index === 0
                 ? getRegistrationEventWarning({ event, effectiveState, referenceTime })
@@ -793,11 +798,40 @@ function RegistrationEventCard({
   event,
   eventWarning,
   isIndexerReported,
+  atomicUnitsPerNight,
 }: {
   event: RegistrationEvent
   eventWarning: RegistrationEventWarning | null
   isIndexerReported: boolean
+  atomicUnitsPerNight: bigint
 }) {
+  if (event.type === "night_transfer") {
+    const isReceived = event.nightDirection === "received"
+    const formattedAmount =
+      event.nightAmount
+        ? formatCompactAtomicQuantity(BigInt(event.nightAmount), atomicUnitsPerNight)
+        : "?"
+    const badgeStyle = isReceived
+      ? "bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-300"
+      : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+    return (
+      <li className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">
+            {isReceived ? "NIGHT Received" : "NIGHT Sent"}
+          </p>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle}`}>
+            {formattedAmount} NIGHT
+          </span>
+        </div>
+        <dl className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
+          <EventDetail label="Block time" value={formatCheckedAt(event.blockTime)} />
+          <TransactionDetail txHash={event.txHash} />
+        </dl>
+      </li>
+    )
+  }
+
   const isCreated = event.type === "registration_created"
 
   const cardStyle = isCreated

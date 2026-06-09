@@ -608,7 +608,8 @@ function getRecentRegistrationActivity(
   return (
     timeline.events.find(
       (e) =>
-        e.type !== "unknown" &&
+        (e.type === "registration_created" ||
+          e.type === "registration_removed") &&
         e.blockTime != null &&
         Date.parse(e.blockTime) >= cutoffMs,
     ) ?? null
@@ -698,7 +699,7 @@ function WorldLabel({ world }: { world: "cardano" | "midnight" }) {
         rel="noopener noreferrer"
         className="text-xs text-slate-400 hover:text-violet-500 dark:hover:text-violet-400 transition-colors"
       >
-        ? Help
+        Help?
       </a>
     </div>
   )

@@ -4,6 +4,9 @@ import type {
   CardanoUtxo,
   CardanoUtxoAsset,
 } from "@/domain/cardanoAccount"
+import {
+  DEFAULT_CARDANO_NIGHT_POLICY_ID,
+} from "@/domain/cardanoAccount"
 import type {
   CardanoChainProvider,
   CardanoTransaction,
@@ -35,6 +38,13 @@ const koiosMetadataSchema = z
 
 const koiosMetadataResponseSchema = z.array(koiosMetadataSchema)
 
+const koiosTxAssetItemSchema = z
+  .object({
+    policy_id: z.string(),
+    quantity: z.union([z.string(), z.number()]),
+  })
+  .passthrough()
+
 const koiosTxOutputSchema = z
   .object({
     tx_index: z.union([z.number(), z.string()]),
@@ -43,6 +53,8 @@ const koiosTxOutputSchema = z
         bech32: z.string(),
       })
       .passthrough(),
+    stake_addr: z.string().nullable().optional(),
+    asset_list: z.array(koiosTxAssetItemSchema).optional().default([]),
   })
   .passthrough()
 
@@ -119,8 +131,10 @@ const koiosTxInputSchema = z
       .passthrough()
       .optional(),
     stake_addr: z.string().nullable().optional(),
+    asset_list: z.array(koiosTxAssetItemSchema).optional().default([]),
   })
   .passthrough()
+
 
 const koiosTxInfoWithInputsSchema = z
   .object({
@@ -194,7 +208,7 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
         headers,
         // _inputs: true is required — without it Koios omits the inputs array,
         // which prevents detection of de-registration (contract-spend) transactions.
-        body: JSON.stringify({ _tx_hashes: [txHash], _inputs: true }),
+        body: JSON.stringify({ _tx_hashes: [txHash], _inputs: true, _assets: true }),
         cache: "no-store",
       }),
     ])
@@ -207,8 +221,21 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
     const metadata =
       metadataParsed.find((item) => item.tx_hash === txHash)?.metadata ?? null
 
-    let inputs: Array<{ address?: string }> = []
-    let outputs: Array<{ address: string }> = []
+    const nightPolicyId = (
+      process.env.CARDANO_NIGHT_POLICY_ID ?? DEFAULT_CARDANO_NIGHT_POLICY_ID
+    ).toLowerCase()
+
+    const getNightQty = (
+      assets: Array<{ policy_id: string; quantity: string | number }>,
+    ): string | null => {
+      const found = assets.find(
+        (a) => a.policy_id.toLowerCase() === nightPolicyId,
+      )
+      return found != null ? String(found.quantity) : null
+    }
+
+    let inputs: Array<{ address?: string; nightQuantity: string | null }> = []
+    let outputs: Array<{ address: string; nightQuantity: string | null }> = []
     if (txInfoResponse.ok) {
       try {
         const txInfoRaw = await readJsonResponse(txInfoResponse)
@@ -218,9 +245,13 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
         if (txInfo) {
           inputs = txInfo.inputs.map((inp) => ({
             address: inp.payment_addr?.bech32,
+            stakeAddress: inp.stake_addr ?? null,
+            nightQuantity: getNightQty(inp.asset_list),
           }))
           outputs = txInfo.outputs.map((out) => ({
             address: out.payment_addr.bech32,
+            stakeAddress: out.stake_addr ?? null,
+            nightQuantity: getNightQty(out.asset_list),
           }))
         }
       } catch {

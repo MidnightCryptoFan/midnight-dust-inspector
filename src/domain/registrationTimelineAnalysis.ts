@@ -20,9 +20,14 @@ export function buildRegistrationTimeline(input: {
   stakeAddress: string
   transactions: CardanoTransaction[]
   detailsByTxHash: Map<string, CardanoTransactionDetails>
+  userAddresses?: string[]
   checkedAt: string
   source: "koios"
 }): RegistrationTimeline {
+  const userAddressSet = new Set(
+    (input.userAddresses ?? []).map((a) => a.toLowerCase()),
+  )
+
   const chronologicalTransactions = [...input.transactions].sort(
     (left, right) =>
       Date.parse(left.blockTime ?? "1970-01-01T00:00:00.000Z") -
@@ -34,8 +39,10 @@ export function buildRegistrationTimeline(input: {
       stakeAddress: input.stakeAddress,
       transaction,
       details: input.detailsByTxHash.get(transaction.txHash) ?? null,
+      userAddresses: userAddressSet,
     }),
   )
+
 
   return {
     stakeAddress: input.stakeAddress,
@@ -52,6 +59,7 @@ export function classifyRegistrationEvent(input: {
   stakeAddress: string
   transaction: CardanoTransaction
   details: CardanoTransactionDetails | null
+  userAddresses?: Set<string>
 }): RegistrationEvent {
   const scriptAddress = DUST_CONTRACT.scriptAddress
   const details = input.details
@@ -74,6 +82,8 @@ export function classifyRegistrationEvent(input: {
         "An input from the DUST registration contract address was detected.",
       ],
       dustAddress: null,
+      nightAmount: null,
+      nightDirection: null,
       ...input,
     })
   }
@@ -90,6 +100,8 @@ export function classifyRegistrationEvent(input: {
         "An output to the DUST registration contract address was detected.",
       ],
       dustAddress,
+      nightAmount: null,
+      nightDirection: null,
       ...input,
     })
   }
@@ -106,6 +118,8 @@ export function classifyRegistrationEvent(input: {
         "This transaction contains metadata that looks like a DUST registration removal.",
       technicalDetails: ["Removal wording was found in transaction metadata."],
       dustAddress,
+      nightAmount: null,
+      nightDirection: null,
       ...input,
     })
   }
@@ -120,6 +134,26 @@ export function classifyRegistrationEvent(input: {
         ? ["A DUST-like address was found in transaction metadata."]
         : ["Registration wording was found in transaction metadata."],
       dustAddress,
+      nightAmount: null,
+      nightDirection: null,
+      ...input,
+    })
+  }
+
+  // Detect NIGHT token transfers to/from user addresses.
+  const nightTransfer = detectNightTransfer(details, input.userAddresses ?? new Set(), input.stakeAddress)
+  if (nightTransfer) {
+    const verb = nightTransfer.direction === "received" ? "Received" : "Sent"
+    return createEvent({
+      type: "night_transfer",
+      confidence: "high",
+      summary: `${verb} NIGHT.`,
+      technicalDetails: [
+        `NIGHT token movement detected: ${nightTransfer.direction} ${nightTransfer.amount} atomic units.`,
+      ],
+      dustAddress: null,
+      nightAmount: nightTransfer.amount,
+      nightDirection: nightTransfer.direction,
       ...input,
     })
   }
@@ -128,7 +162,7 @@ export function classifyRegistrationEvent(input: {
     type: "unknown",
     confidence: "low",
     summary:
-      "This Cardano transaction was found for the stake address but could not be identified as a DUST registration or removal.",
+      "This Cardano transaction was found for the stake address but could not be identified as a DUST registration, removal, or NIGHT transfer.",
     technicalDetails:
       searchableText.trim().length > 0
         ? [
@@ -138,8 +172,60 @@ export function classifyRegistrationEvent(input: {
             "No readable transaction metadata was found by the Cardano provider.",
           ],
     dustAddress: null,
+    nightAmount: null,
+    nightDirection: null,
     ...input,
   })
+}
+
+function detectNightTransfer(
+  details: CardanoTransactionDetails | null,
+  userAddresses: Set<string>,
+  userStakeAddress?: string,
+): { amount: string; direction: "received" | "sent" } | null {
+  if (!details) return null
+
+  const stakeAddrLower = userStakeAddress?.toLowerCase()
+
+  const isUserOutput = (out: { address: string; stakeAddress?: string | null }) =>
+    userAddresses.has(out.address.toLowerCase()) ||
+    (stakeAddrLower != null && out.stakeAddress != null && out.stakeAddress.toLowerCase() === stakeAddrLower)
+
+  const isUserInput = (inp: { address?: string; stakeAddress?: string | null }) =>
+    (inp.address != null && userAddresses.has(inp.address.toLowerCase())) ||
+    (stakeAddrLower != null && inp.stakeAddress != null && inp.stakeAddress.toLowerCase() === stakeAddrLower)
+
+  let nightIn = 0n
+  for (const output of details.outputs) {
+    if (output.nightQuantity && isUserOutput(output)) {
+      try {
+        nightIn += BigInt(output.nightQuantity)
+      } catch {
+        // ignore parse error
+      }
+    }
+  }
+
+  let nightOut = 0n
+  for (const input of details.inputs) {
+    if (input.nightQuantity && isUserInput(input)) {
+      try {
+        nightOut += BigInt(input.nightQuantity)
+      } catch {
+        // ignore parse error
+      }
+    }
+  }
+
+  if (nightIn === 0n && nightOut === 0n) return null
+
+  const net = nightIn - nightOut
+  if (net > 0n) return { amount: net.toString(), direction: "received" }
+  if (net < 0n) return { amount: (-net).toString(), direction: "sent" }
+
+  // Net zero but NIGHT was involved — treat as received (internal move)
+  if (nightIn > 0n) return { amount: nightIn.toString(), direction: "received" }
+  return null
 }
 
 export function collectSearchableText(value: unknown): string {
@@ -194,6 +280,8 @@ function createEvent(input: {
   summary: string
   technicalDetails: string[]
   dustAddress: string | null
+  nightAmount: string | null
+  nightDirection: "received" | "sent" | null
   stakeAddress: string
   transaction: CardanoTransaction
   details: CardanoTransactionDetails | null
@@ -205,6 +293,8 @@ function createEvent(input: {
     blockHeight: input.transaction.blockHeight,
     stakeAddress: input.stakeAddress,
     dustAddress: input.dustAddress,
+    nightAmount: input.nightAmount,
+    nightDirection: input.nightDirection,
     confidence: input.confidence,
     summary: input.summary,
     technicalDetails: input.technicalDetails,
@@ -219,17 +309,20 @@ function createEvent(input: {
 function calculateActiveRegistrationCount(
   events: RegistrationEvent[],
 ): number | null {
-  const knownEvents = events.filter((event) => event.type !== "unknown")
+  const registrationEvents = events.filter(
+    (event) =>
+      event.type === "registration_created" ||
+      event.type === "registration_removed",
+  )
 
-  if (knownEvents.length === 0) {
+  if (registrationEvents.length === 0) {
     return null
   }
 
-  return knownEvents.reduce((count, event) => {
+  return registrationEvents.reduce((count, event) => {
     if (event.type === "registration_created") {
       return count + 1
     }
-
     return Math.max(0, count - 1)
   }, 0)
 }
