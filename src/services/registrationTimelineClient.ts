@@ -87,7 +87,7 @@ export async function inspectRegistrationTimeline(
 }
 
 function getTimelineLimit(): number {
-  const parsed = Number(process.env.CARDANO_TIMELINE_TRANSACTION_LIMIT ?? "25")
+  const parsed = Number(process.env.CARDANO_TIMELINE_TRANSACTION_LIMIT ?? "100")
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return 25
