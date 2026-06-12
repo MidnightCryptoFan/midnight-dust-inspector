@@ -5,13 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.4.0
+## [Unreleased] – 0.3.1
 
 ### Added
-- *(nothing yet)*
+- GitHub repository link on "MidnightCryptoFan" in the footer
 
 ### Fixed
-- *(nothing yet)*
+- `CARDANO_TIMELINE_TRANSACTION_LIMIT` in `.env.example` corrected from 25 to 100
+  to match the code default set in v0.2.0
 
 ---
 
