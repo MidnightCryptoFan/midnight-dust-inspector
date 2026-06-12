@@ -7,8 +7,8 @@ const { version } = _require("./package.json") as { version: string }
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
-    // Set NEXT_PUBLIC_APP_CHANNEL in .env.local to "dev" or "rc" to show
-    // a channel badge in the footer. Leave unset on the stable/main branch.
+    // "dev" | "rc" | "" — set per branch; leave empty on main (stable).
+    NEXT_PUBLIC_APP_CHANNEL: "dev",
   },
   // Lucid Evolution uses CML (Cardano Multiplatform Library) which is WASM-backed.
   // These packages must not be bundled server-side.

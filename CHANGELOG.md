@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Unreleased] – 0.3.0
+
+### Added
+- *(nothing yet)*
+
+### Changed
+- *(nothing yet)*
+
+### Fixed
+- *(nothing yet)*
+
+---
+
 ## [0.2.0] – 2026-06-12
 
 ### Added
