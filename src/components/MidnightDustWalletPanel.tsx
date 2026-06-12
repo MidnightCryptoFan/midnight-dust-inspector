@@ -17,6 +17,7 @@ import {
   type MidnightWalletConnectionMode,
   type MidnightWalletInfo,
 } from "@/services/wallet/midnightDappConnector"
+import { CopyButton } from "./CopyButton"
 import {
   requestBrowserWalletDiscovery,
   subscribeToBrowserWalletDiscovery,
@@ -150,11 +151,14 @@ export function MidnightDustWalletPanel({
                 <p className="mt-0.5 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-300">
                   Midnight DUST address
                 </p>
-                <p className="mt-0.5 break-all font-mono text-xs font-semibold text-violet-900 dark:text-violet-100">
-                  {balance.dustAddress
-                    ? `${balance.dustAddress.slice(0, 20)}…${balance.dustAddress.slice(-6)}`
-                    : "—"}
-                </p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs font-semibold text-violet-900 dark:text-violet-100">
+                    {balance.dustAddress
+                      ? `${balance.dustAddress.slice(0, 20)}…${balance.dustAddress.slice(-6)}`
+                      : "—"}
+                  </span>
+                  {balance.dustAddress && <CopyButton text={balance.dustAddress} />}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2.5">

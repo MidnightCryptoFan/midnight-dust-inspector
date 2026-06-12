@@ -9,6 +9,7 @@ import type {
 } from "@/domain/registrationTimeline"
 import { formatCheckedAt, formatCompactAtomicQuantity } from "@/lib/formatting"
 import { decodeBech32 } from "@/lib/bech32"
+import { CopyButton } from "./CopyButton"
 
 type DustGrowthStatus = "unchecked" | "checking" | "growing" | "stable"
 
@@ -931,21 +932,6 @@ function RegistrationEventCard({
 }
 
 function TransactionDetail({ txHash }: { txHash: string }) {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
-    "idle",
-  )
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(txHash)
-      setCopyState("copied")
-      window.setTimeout(() => setCopyState("idle"), 1_500)
-    } catch {
-      setCopyState("failed")
-      window.setTimeout(() => setCopyState("idle"), 2_500)
-    }
-  }
-
   return (
     <div>
       <dt className="font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
@@ -955,17 +941,7 @@ function TransactionDetail({ txHash }: { txHash: string }) {
         <span className="font-mono text-slate-700 dark:text-slate-300">
           {txHash.slice(0, 12)}...{txHash.slice(-8)}
         </span>
-        <button
-          className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-          type="button"
-          onClick={handleCopy}
-        >
-          {copyState === "copied"
-            ? "Copied"
-            : copyState === "failed"
-              ? "Copy failed"
-              : "Copy"}
-        </button>
+        <CopyButton text={txHash} />
         <a
           href={`https://cardanoscan.io/transaction/${txHash}`}
           target="_blank"

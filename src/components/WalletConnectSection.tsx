@@ -11,6 +11,7 @@ import {
   requestBrowserWalletDiscovery,
   subscribeToBrowserWalletDiscovery,
 } from "@/services/wallet/walletDiscoveryStore"
+import { CopyButton } from "./CopyButton"
 
 type WalletConnectSectionProps = {
   connected: ConnectedWallet | null
@@ -85,10 +86,12 @@ export function WalletConnectSection({
             <p className="mt-0.5 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-300">
               Cardano stake address
             </p>
-            <p className="mt-0.5 break-all font-mono text-xs font-semibold text-blue-900 dark:text-blue-100">
-              {connected.stakeAddress.slice(0, 20)}...
-              {connected.stakeAddress.slice(-6)}
-            </p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-xs font-semibold text-blue-900 dark:text-blue-100">
+                {connected.stakeAddress.slice(0, 20)}…{connected.stakeAddress.slice(-6)}
+              </span>
+              <CopyButton text={connected.stakeAddress} />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2.5">
