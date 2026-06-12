@@ -164,7 +164,7 @@ export function InspectorApp() {
         if (dustGrowthCheckRef.current?.walletId !== walletId) return
         try {
           const result = await readMidnightWalletDustBalance(walletId, {
-            connectionMode: "mainnet",
+            connectionMode: "configured-network",
           })
           if (result.balance) {
             setMidnightDustBalance(result.balance)
@@ -242,7 +242,9 @@ export function InspectorApp() {
     setValidationMessage(null)
     setValidationNote(validation.note ?? null)
     setIsLoading(true)
-    router.replace(`?stake=${encodeURIComponent(validation.address)}`, { scroll: false })
+    router.replace(`?stake=${encodeURIComponent(validation.address)}`, {
+      scroll: false,
+    })
 
     try {
       const [result, timelineResult] = await Promise.all([
@@ -552,7 +554,9 @@ export function InspectorApp() {
               onConnected={handleWalletConnected}
               onDisconnected={handleWalletDisconnected}
               autoRefresh={autoRefresh}
-              onAutoRefreshToggle={inspection ? () => setAutoRefresh((p) => !p) : undefined}
+              onAutoRefreshToggle={
+                inspection ? () => setAutoRefresh((p) => !p) : undefined
+              }
               embedded
             />
             {!connectedWallet && (
@@ -742,7 +746,8 @@ async function resolveRegistrationAddress(
   }
 }
 
-const HELP_BASE = "https://midnightcryptofan.github.io/midnight-dust-inspector-help"
+const HELP_BASE =
+  "https://midnightcryptofan.github.io/midnight-dust-inspector-help"
 
 function WorldLabel({ world }: { world: "cardano" | "midnight" }) {
   if (world === "cardano") {

@@ -18,10 +18,9 @@ export type TxResult =
 
 async function buildLucid(walletApi: WalletApi) {
   const { Lucid, Koios } = await import("@lucid-evolution/lucid")
-  const lucid = await Lucid(
-    new Koios("https://api.koios.rest/api/v1"),
-    "Mainnet",
-  )
+  const koiosUrl =
+    process.env.NEXT_PUBLIC_CARDANO_KOIOS_URL ?? "https://api.koios.rest/api/v1"
+  const lucid = await Lucid(new Koios(koiosUrl), "Mainnet")
   lucid.selectWallet.fromAPI(walletApi)
   return lucid
 }

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { extractStakeAddressFromCardanoAddress } from "./bech32"
+import { decodeBech32, extractStakeAddressFromCardanoAddress } from "./bech32"
 
 export type AddressValidationResult =
   | { valid: true; address: string; note?: string }
@@ -9,22 +9,41 @@ export const stakeAddressSchema = z
   .string()
   .trim()
   .min(1, "Paste your Cardano stake address before checking.")
-  .refine((value) => value.toLowerCase().startsWith("stake"), {
+  .refine((value) => parseStakeAddress(value) !== null, {
     message:
-      "This does not look like a Cardano stake address. Stake addresses usually start with stake or stake_test.",
+      "This does not look like a valid Cardano stake address. Stake addresses usually start with stake1 or stake_test1.",
   })
+  .transform((value) => value.toLowerCase())
 
 export function validateStakeAddress(input: string): AddressValidationResult {
   const trimmed = input.trim()
 
   if (!trimmed) {
-    return { valid: false, message: "Paste your Cardano stake address before checking." }
+    return {
+      valid: false,
+      message: "Paste your Cardano stake address before checking.",
+    }
   }
 
   const lower = trimmed.toLowerCase()
 
   if (lower.startsWith("stake")) {
-    return { valid: true, address: trimmed }
+    const parsed = parseStakeAddress(trimmed)
+    if (!parsed) {
+      return {
+        valid: false,
+        message:
+          "This does not look like a valid Cardano stake address. Check the address and paste the full stake1 or stake_test1 address.",
+      }
+    }
+
+    return parsed.network === "testnet"
+      ? {
+          valid: true,
+          address: parsed.address,
+          note: "This is a testnet stake address. The default Midnight DUST Inspector endpoints are configured for mainnet.",
+        }
+      : { valid: true, address: parsed.address }
   }
 
   // If the user pasted a full Cardano base address, try to extract the stake key.
@@ -48,5 +67,35 @@ export function validateStakeAddress(input: string): AddressValidationResult {
     valid: false,
     message:
       "This does not look like a Cardano stake address. Stake addresses usually start with stake or stake_test.",
+  }
+}
+
+function parseStakeAddress(
+  input: string,
+): { address: string; network: "mainnet" | "testnet" } | null {
+  const trimmed = input.trim()
+  const lower = trimmed.toLowerCase()
+  const upper = trimmed.toUpperCase()
+
+  if (trimmed !== lower && trimmed !== upper) {
+    return null
+  }
+
+  const decoded = decodeBech32(lower)
+  if (!decoded) return null
+  if (decoded.hrp !== "stake" && decoded.hrp !== "stake_test") return null
+  if (decoded.bytes.length !== 29) return null
+
+  const header = decoded.bytes[0]!
+  const addressType = (header & 0xf0) >> 4
+  const networkId = header & 0x0f
+
+  if (addressType !== 14 && addressType !== 15) return null
+  if (decoded.hrp === "stake" && networkId !== 1) return null
+  if (decoded.hrp === "stake_test" && networkId === 1) return null
+
+  return {
+    address: lower,
+    network: decoded.hrp === "stake" ? "mainnet" : "testnet",
   }
 }

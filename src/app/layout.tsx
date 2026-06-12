@@ -15,7 +15,8 @@ const geistMono = Geist_Mono({
 })
 
 const baseUrl =
-  process.env.NEXT_PUBLIC_BASE_URL ?? "https://midnight-dust-inspector.vercel.app"
+  process.env.NEXT_PUBLIC_BASE_URL ??
+  "https://midnight-dust-inspector.vercel.app"
 
 const title = "Midnight DUST Inspector – Check & Manage DUST Generation"
 const description =

@@ -43,7 +43,6 @@ export function buildRegistrationTimeline(input: {
     }),
   )
 
-
   return {
     stakeAddress: input.stakeAddress,
     events,
@@ -141,7 +140,11 @@ export function classifyRegistrationEvent(input: {
   }
 
   // Detect NIGHT token transfers to/from user addresses.
-  const nightTransfer = detectNightTransfer(details, input.userAddresses ?? new Set(), input.stakeAddress)
+  const nightTransfer = detectNightTransfer(
+    details,
+    input.userAddresses ?? new Set(),
+    input.stakeAddress,
+  )
   if (nightTransfer) {
     const verb = nightTransfer.direction === "received" ? "Received" : "Sent"
     return createEvent({
@@ -187,13 +190,23 @@ function detectNightTransfer(
 
   const stakeAddrLower = userStakeAddress?.toLowerCase()
 
-  const isUserOutput = (out: { address: string; stakeAddress?: string | null }) =>
+  const isUserOutput = (out: {
+    address: string
+    stakeAddress?: string | null
+  }) =>
     userAddresses.has(out.address.toLowerCase()) ||
-    (stakeAddrLower != null && out.stakeAddress != null && out.stakeAddress.toLowerCase() === stakeAddrLower)
+    (stakeAddrLower != null &&
+      out.stakeAddress != null &&
+      out.stakeAddress.toLowerCase() === stakeAddrLower)
 
-  const isUserInput = (inp: { address?: string; stakeAddress?: string | null }) =>
+  const isUserInput = (inp: {
+    address?: string
+    stakeAddress?: string | null
+  }) =>
     (inp.address != null && userAddresses.has(inp.address.toLowerCase())) ||
-    (stakeAddrLower != null && inp.stakeAddress != null && inp.stakeAddress.toLowerCase() === stakeAddrLower)
+    (stakeAddrLower != null &&
+      inp.stakeAddress != null &&
+      inp.stakeAddress.toLowerCase() === stakeAddrLower)
 
   let nightIn = 0n
   for (const output of details.outputs) {

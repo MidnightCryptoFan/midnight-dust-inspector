@@ -8,13 +8,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] – 0.5.0
 
 ### Added
-- *(nothing yet)*
+
+- _(nothing yet)_
 
 ---
 
 ## [0.4.0] – 2026-06-12
 
 ### Added
+
 - Cardanoscan explorer link on every transaction in the registration timeline
 - URL parameter support (`?stake=`): pre-fills and auto-submits the address on
   page load; URL is updated after every successful lookup for easy sharing
@@ -36,9 +38,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.3.1] – 2026-06-12
 
 ### Added
+
 - GitHub repository link on "MidnightCryptoFan" in the footer
 
 ### Fixed
+
 - `CARDANO_TIMELINE_TRANSACTION_LIMIT` in `.env.example` corrected from 25 to 100
   to match the code default set in v0.2.0
 
@@ -47,6 +51,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.3.0] – 2026-06-12
 
 ### Added
+
 - Channel badge in the footer (`dev` / `rc` / empty = stable), driven by
   `NEXT_PUBLIC_APP_CHANNEL` in `next.config.ts` — value differs per branch
 
@@ -55,6 +60,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.2.0] – 2026-06-12
 
 ### Added
+
 - Version number displayed in the page footer, sourced from `package.json`
 - Channel badge in footer (`dev` / `rc`) configurable via `NEXT_PUBLIC_APP_CHANNEL`
 - "Created by MidnightCryptoFan" credit in the footer
@@ -63,6 +69,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - NIGHT transfer events in the registration timeline (receive / send)
 
 ### Fixed
+
 - Address input now accepts full Cardano payment addresses (`addr1…`) in
   addition to stake addresses (`stake1…`); the stake key is extracted
   automatically and the label/description text reflects this
@@ -77,6 +84,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.1.0] – 2026-05-01
 
 ### Added
+
 - Initial release of the Midnight DUST Inspector
 - Cardano stake address lookup via Koios API
 - Midnight indexer DUST generation status query

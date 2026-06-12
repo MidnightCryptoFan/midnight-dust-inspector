@@ -39,8 +39,8 @@ export function AddressInput({
           <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-900 dark:bg-slate-800 dark:text-slate-100">
             addr1…
           </code>
-          ) — the stake key is extracted automatically. Stake addresses are shown
-          under{" "}
+          ) — the stake key is extracted automatically. Stake addresses are
+          shown under{" "}
           <span className="font-medium text-slate-700 dark:text-slate-200">
             Receive
           </span>{" "}

@@ -33,7 +33,8 @@ const inactiveStatus: DustGenerationStatus = {
 const activeStatus: DustGenerationStatus = {
   ...inactiveStatus,
   registered: true,
-  utxoTxHash: "5dce41e2b8d5f4fd750e71f74ac2a27398031b7ab46fd2060239d1bee8b398b0",
+  utxoTxHash:
+    "5dce41e2b8d5f4fd750e71f74ac2a27398031b7ab46fd2060239d1bee8b398b0",
   utxoOutputIndex: "0",
 }
 
@@ -212,7 +213,7 @@ describe("CardanoInspectionPanel registration history", () => {
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(removalEvent.txHash),
     )
-    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Copied!" })).toBeTruthy()
   })
 
   test("warns that a contradictory recent event may still be syncing", () => {

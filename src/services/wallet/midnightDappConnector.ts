@@ -110,7 +110,7 @@ export async function readMidnightWalletDustBalance(
   const wallet = resolvedWallet?.wallet
   const resolvedWalletId = resolvedWallet?.id ?? walletId
   const timeoutMs = options?.timeoutMs ?? DEFAULT_MIDNIGHT_WALLET_TIMEOUT_MS
-  const connectionMode = options?.connectionMode ?? "mainnet"
+  const connectionMode = options?.connectionMode ?? "configured-network"
   const networkId = getNetworkIdForConnectionMode(
     connectionMode,
     options?.networkId,

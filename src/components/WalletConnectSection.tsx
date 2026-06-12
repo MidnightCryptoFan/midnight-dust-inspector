@@ -92,7 +92,8 @@ export function WalletConnectSection({
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
               <span className="font-mono text-xs font-semibold text-blue-900 dark:text-blue-100">
-                {connected.stakeAddress.slice(0, 20)}…{connected.stakeAddress.slice(-6)}
+                {connected.stakeAddress.slice(0, 20)}…
+                {connected.stakeAddress.slice(-6)}
               </span>
               <CopyButton text={connected.stakeAddress} />
             </div>
@@ -124,7 +125,9 @@ export function WalletConnectSection({
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  autoRefresh ? "animate-pulse bg-green-500" : "bg-slate-300 dark:bg-slate-600"
+                  autoRefresh
+                    ? "animate-pulse bg-green-500"
+                    : "bg-slate-300 dark:bg-slate-600"
                 }`}
               />
               {autoRefresh ? "Auto-refresh on · 60s" : "Auto-refresh"}

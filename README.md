@@ -15,12 +15,12 @@ You enter a Cardano stake address (or connect your wallet) and the inspector sho
 
 ## What you need
 
-| Requirement | Notes |
-|---|---|
-| [Node.js](https://nodejs.org) 18 or newer | Download the LTS version from nodejs.org |
-| A browser | Chrome, Firefox, Brave, or Edge |
-| A Cardano wallet extension | Optional — needed only to register/deregister. Works with Lace, Eternl, Nami, and other CIP-30 wallets. |
-| A Midnight wallet extension | Optional — needed only to read your live DUST balance and address. |
+| Requirement                               | Notes                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [Node.js](https://nodejs.org) 18 or newer | Download the LTS version from nodejs.org                                                                |
+| A browser                                 | Chrome, Firefox, Brave, or Edge                                                                         |
+| A Cardano wallet extension                | Optional — needed only to register/deregister. Works with Lace, Eternl, Nami, and other CIP-30 wallets. |
+| A Midnight wallet extension               | Optional — needed only to read your live DUST balance and address.                                      |
 
 ---
 
@@ -29,6 +29,7 @@ You enter a Cardano stake address (or connect your wallet) and the inspector sho
 **1. Download the project**
 
 If you have Git installed:
+
 ```bash
 git clone https://github.com/MidnightCryptoFan/midnight-dust-inspector.git
 cd midnight-dust-inspector
@@ -37,6 +38,7 @@ cd midnight-dust-inspector
 Or click **Code → Download ZIP** on GitHub, unzip the folder, and open a terminal inside it.
 
 **2. Install dependencies**
+
 ```bash
 npm install
 ```
@@ -44,6 +46,7 @@ npm install
 This downloads all required packages into a local `node_modules` folder. Nothing is installed system-wide.
 
 **3. Create your configuration file**
+
 ```bash
 cp .env.example .env.local
 ```
@@ -51,6 +54,7 @@ cp .env.example .env.local
 The default values in `.env.example` already point to the public Midnight mainnet endpoints. You do not need to change anything for normal use.
 
 **4. Start the app**
+
 ```bash
 npm run dev
 ```
@@ -59,7 +63,7 @@ npm run dev
 
 Go to [http://localhost:3000](http://localhost:3000)
 
-The inspector is now running locally on your computer. Nothing is sent to any server you do not control.
+The inspector is now running locally on your computer. To show status data, it queries the configured public Midnight Indexer and Cardano Koios endpoints.
 
 ---
 
@@ -83,6 +87,8 @@ Click **Connect** in the Midnight section to read your DUST balance, generation 
 
 - The tool **never asks for your seed phrase or private keys**
 - It **never stores** your wallet data
+- Stake addresses you inspect are sent to the configured Midnight Indexer and Cardano Koios endpoints so the app can read public status and on-chain history
+- The inspected stake address is reflected in the page URL as `?stake=...` for refresh/share support; the app sends a referrer policy that avoids leaking the full URL to external sites
 - Wallet signing always happens **inside your wallet extension**, not in this app
 - Inspection without a wallet is completely **read-only**
 - The Cardano and Midnight wallet connections can be **disconnected** at any time
@@ -100,8 +106,11 @@ NEXT_PUBLIC_MIDNIGHT_INDEXER_URL=https://indexer.mainnet.midnight.network/api/v4
 # Midnight network
 NEXT_PUBLIC_MIDNIGHT_NETWORK_ID=mainnet
 
-# Cardano data provider (Koios)
+# Cardano data provider (Koios) for server-side API routes
 CARDANO_KOIOS_URL=https://api.koios.rest/api/v1
+
+# Browser-visible Koios endpoint used when building wallet transactions
+NEXT_PUBLIC_CARDANO_KOIOS_URL=https://api.koios.rest/api/v1
 
 # NIGHT token identifiers
 CARDANO_NIGHT_POLICY_ID=0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa

@@ -51,7 +51,7 @@ describe("MidnightDustWalletPanel", () => {
       />,
     )
 
-    expect(screen.getByText("Wallet DUST address")).toBeTruthy()
+    expect(screen.getByText("Midnight DUST address")).toBeTruthy()
     expect(screen.queryByText(/Address mismatch/)).toBeNull()
   })
 

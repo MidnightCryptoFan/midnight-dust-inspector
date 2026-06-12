@@ -2,7 +2,8 @@
 
 const faqs: { question: string; answer: string }[] = [
   {
-    question: "Why are there two blockchains — and why might I need two wallets?",
+    question:
+      "Why are there two blockchains — and why might I need two wallets?",
     answer:
       "Midnight and Cardano are two separate but connected blockchains. Cardano is where your NIGHT tokens live and where registration transactions are submitted. Midnight is where DUST is generated and where the Midnight DApp ecosystem runs.\n\nBecause they are independent networks, each has its own wallet: a Cardano wallet (e.g. Lace or Eternl) manages your NIGHT and handles registration transactions, while a Midnight wallet holds your DUST and your Midnight address. The two wallets are linked by the registration — it tells the Midnight network which Midnight address should receive DUST for a given Cardano stake key.\n\nYou do not need to connect both wallets to use this inspector. A Cardano wallet or even just a stake address is enough to check your registration status. The Midnight wallet connection is optional and only needed to read your live DUST balance and address.",
   },
@@ -50,7 +51,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: "Is this tool safe — does it get access to my wallet?",
     answer:
-      "Yes, it is safe. The inspector never asks for your seed phrase or private keys. Wallet connections use your browser wallet extension (CIP-30 for Cardano, DApp Connector for Midnight), and all transaction signing happens inside the extension — never inside this app. You can also inspect any stake address without connecting a wallet at all.",
+      "Yes, it is safe. The inspector never asks for your seed phrase or private keys. Wallet connections use your browser wallet extension (CIP-30 for Cardano, DApp Connector for Midnight), and all transaction signing happens inside the extension — never inside this app. When you inspect a stake address, that public address is sent to the configured Midnight indexer and Cardano Koios endpoints so the app can fetch status and timeline data.",
   },
   {
     question: "Which wallets are supported?",
