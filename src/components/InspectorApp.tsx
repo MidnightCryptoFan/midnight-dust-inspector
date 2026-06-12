@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { AddressInput } from "./AddressInput"
 import { CardanoInspectionPanel } from "./CardanoInspectionPanel"
 import { MidnightDustWalletPanel } from "./MidnightDustWalletPanel"
@@ -70,7 +71,9 @@ type InspectionState = {
 
 export function InspectorApp() {
   const mockModeEnabled = isMockIndexerEnabled()
-  const [address, setAddress] = useState("")
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [address, setAddress] = useState(() => searchParams.get("stake") ?? "")
   const [validationMessage, setValidationMessage] = useState<string | null>(
     null,
   )
@@ -93,12 +96,23 @@ export function InspectorApp() {
   const [dustRate, setDustRate] = useState<bigint | null>(null)
   const [activeRegistrationLookup, setActiveRegistrationLookup] =
     useState<ActiveRegistrationLookup>({ status: "idle" })
+  const [autoRefresh, setAutoRefresh] = useState(false)
   const dustGrowthCheckRef = useRef<{
     walletId: string
     phase: "checking" | "done"
     initialBalance: bigint
     startedAt: number
   } | null>(null)
+
+  // Auto-submit when ?stake= is present in the URL on first load.
+  useEffect(() => {
+    const initialStake = searchParams.get("stake")
+    if (initialStake) {
+      void runInspection(initialStake)
+    }
+    // Run only once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!midnightDustBalance) {
@@ -175,6 +189,17 @@ export function InspectorApp() {
     return () => window.clearTimeout(timeoutId)
   }, [midnightDustBalance])
 
+  useEffect(() => {
+    if (!autoRefresh || !inspection?.stakeAddress) return
+    const stakeAddress = inspection.stakeAddress
+    const paymentKeyHash = connectedWallet?.paymentKeyHash ?? null
+    const id = window.setInterval(() => {
+      void runInspection(stakeAddress, { paymentKeyHash })
+    }, 60_000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, inspection?.stakeAddress, connectedWallet?.paymentKeyHash])
+
   async function handleWalletConnected(wallet: ConnectedWallet) {
     setConnectedWallet(wallet)
     setAddress(wallet.stakeAddress)
@@ -192,6 +217,7 @@ export function InspectorApp() {
     setActiveRegistrationLookup({ status: "idle" })
     setDustGrowthStatus("unchecked")
     setDustRate(null)
+    setAutoRefresh(false)
   }
 
   async function handleSubmit() {
@@ -216,6 +242,7 @@ export function InspectorApp() {
     setValidationMessage(null)
     setValidationNote(validation.note ?? null)
     setIsLoading(true)
+    router.replace(`?stake=${encodeURIComponent(validation.address)}`, { scroll: false })
 
     try {
       const [result, timelineResult] = await Promise.all([
@@ -421,13 +448,26 @@ export function InspectorApp() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
         {/* Header */}
         <header className="flex items-start justify-between py-2">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
-              Midnight DUST Inspector
-            </p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl">
-              DUST Dashboard
-            </h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-800">
+              <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7">
+                <rect x="3" y="3" width="4" height="4" fill="white" />
+                <rect x="3" y="10" width="4" height="4" fill="white" />
+                <rect x="3" y="17" width="4" height="4" fill="white" />
+                <path
+                  d="M12.8765 7H7V3.05761C13.5 3.05761 21 1.71441 21 11.9994C21 22.2845 14.2593 20.943 10.4074 20.9421V16.4708H12.8148C13.9383 16.4708 16.1852 16.9188 16.1852 11.9994C16.1852 7.52808 14 7 12.8765 7Z"
+                  fill="white"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                Midnight DUST Inspector
+              </p>
+              <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl">
+                DUST Dashboard
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <a
@@ -511,6 +551,8 @@ export function InspectorApp() {
               connected={connectedWallet}
               onConnected={handleWalletConnected}
               onDisconnected={handleWalletDisconnected}
+              autoRefresh={autoRefresh}
+              onAutoRefreshToggle={inspection ? () => setAutoRefresh((p) => !p) : undefined}
               embedded
             />
             {!connectedWallet && (
