@@ -17,6 +17,7 @@ import {
   type MidnightWalletConnectionMode,
   type MidnightWalletInfo,
 } from "@/services/wallet/midnightDappConnector"
+import { CopyButton } from "./CopyButton"
 import {
   requestBrowserWalletDiscovery,
   subscribeToBrowserWalletDiscovery,
@@ -56,6 +57,7 @@ export function MidnightDustWalletPanel({
   const [connecting, setConnecting] = useState<string | null>(null)
   const [isDiscovering, setIsDiscovering] = useState(true)
   const [, forceDiscoveryRefresh] = useState(0)
+  const [autoRefresh, setAutoRefresh] = useState(false)
   const connectAttemptIdRef = useRef(0)
 
   useEffect(() => {
@@ -65,6 +67,20 @@ export function MidnightDustWalletPanel({
 
     return () => window.clearTimeout(timeoutId)
   }, [])
+
+  useEffect(() => {
+    if (!balance) setAutoRefresh(false)
+  }, [balance])
+
+  useEffect(() => {
+    if (!autoRefresh || !balance?.walletId) return
+    const walletId = balance.walletId
+    const id = window.setInterval(() => {
+      void handleConnect(walletId)
+    }, 60_000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, balance?.walletId])
 
   async function handleConnect(
     walletId: string,
@@ -111,15 +127,73 @@ export function MidnightDustWalletPanel({
     await handleConnect(balance.walletId)
   }
 
+  const connectedWalletInfo = wallets.find((w) => w.id === balance?.walletId) ?? null
+
   const inner = (
     <div className="space-y-4">
-      <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-        Connect to read your Midnight DUST wallet address, DUST balance, and
-        DUST cap. NIGHT stays in your Cardano wallet.
-      </p>
-
       {balance ? (
         <>
+          {/* Connected header — mirrors Cardano WalletConnectSection layout */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              {connectedWalletInfo?.icon ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  alt=""
+                  className="h-7 w-7 rounded-md object-contain"
+                  src={connectedWalletInfo.icon}
+                />
+              ) : null}
+              <div>
+                <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
+                  {balance.walletName}
+                </p>
+                <p className="mt-0.5 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-300">
+                  Midnight DUST address
+                </p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs font-semibold text-violet-900 dark:text-violet-100">
+                    {balance.dustAddress
+                      ? `${balance.dustAddress.slice(0, 20)}…${balance.dustAddress.slice(-6)}`
+                      : "—"}
+                  </span>
+                  {balance.dustAddress && <CopyButton text={balance.dustAddress} />}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                  Connected
+                </span>
+                <button
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  type="button"
+                  onClick={() => onBalanceChange(null, null)}
+                >
+                  Disconnect
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoRefresh((prev) => !prev)}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  autoRefresh
+                    ? "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-950/30 dark:text-green-400"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    autoRefresh ? "animate-pulse bg-green-500" : "bg-slate-300 dark:bg-slate-600"
+                  }`}
+                />
+                {autoRefresh ? "Auto-refresh on · 60s" : "Auto-refresh"}
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-3 gap-2">
             <DustMetric
               label="DUST balance"
@@ -134,12 +208,6 @@ export function MidnightDustWalletPanel({
               label="Generation rate"
               value={formatDustRate(dustGrowthStatus, dustRate)}
               measuring={dustGrowthStatus === "checking"}
-            />
-            <DustMetric
-              label="Wallet DUST address"
-              value={formatNullableValue(balance.dustAddress)}
-              className="col-span-3"
-              mono
             />
           </div>
 
@@ -157,32 +225,27 @@ export function MidnightDustWalletPanel({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-              {balance.walletName}
-            </span>
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {formatCheckedAt(balance.checkedAt)}
             </span>
-            <button
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              disabled={!!connecting}
-              type="button"
-              onClick={handleRefresh}
-            >
-              {connecting ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              type="button"
-              onClick={() => onBalanceChange(null, null)}
-            >
-              Disconnect
-            </button>
+            {!autoRefresh && (
+              <button
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                disabled={!!connecting}
+                type="button"
+                onClick={handleRefresh}
+              >
+                {connecting ? "Refreshing..." : "Refresh"}
+              </button>
+            )}
           </div>
         </>
       ) : (
         <>
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Connect to read your Midnight DUST wallet address, DUST balance, and
+            DUST cap. NIGHT stays in your Cardano wallet.
+          </p>
           {wallets.length > 0 ? (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">

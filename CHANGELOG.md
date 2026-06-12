@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Unreleased] – 0.5.0
+
+### Added
+- *(nothing yet)*
+
+---
+
+## [0.4.0] – 2026-06-12
+
+### Added
+- Cardanoscan explorer link on every transaction in the registration timeline
+- URL parameter support (`?stake=`): pre-fills and auto-submits the address on
+  page load; URL is updated after every successful lookup for easy sharing
+- DUST icon displayed in the page header, spanning both title lines
+- DUST generation rate from the Midnight indexer shown as a summary tile in the
+  Cardano panel — visible without a Midnight wallet connected
+- Auto-refresh toggle (60-second interval) for the Cardano inspection panel,
+  placed in the connected wallet header below Disconnect
+- Auto-refresh toggle (60-second interval) for the Midnight wallet panel,
+  placed in the connected wallet header below Disconnect; manual Refresh button
+  is hidden while auto-refresh is active
+- Copy button next to the stake address in the Cardano connected wallet header
+- Copy button next to the DUST address in the Midnight connected wallet header
+- Midnight connected wallet header now mirrors the Cardano layout: wallet icon,
+  wallet name, address label, truncated address, Connected badge, Disconnect
+
+---
+
 ## [0.3.1] – 2026-06-12
 
 ### Added
