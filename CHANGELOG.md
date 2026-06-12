@@ -5,16 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.3.0
+## [0.3.0-rc.1] – 2026-06-12
 
 ### Added
-- *(nothing yet)*
-
-### Changed
-- *(nothing yet)*
-
-### Fixed
-- *(nothing yet)*
+- Channel badge in the footer (`dev` / `rc` / empty = stable), driven by
+  `NEXT_PUBLIC_APP_CHANNEL` in `next.config.ts` — value differs per branch
 
 ---
 
