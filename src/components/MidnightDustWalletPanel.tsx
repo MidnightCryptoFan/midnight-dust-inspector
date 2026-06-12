@@ -126,15 +126,53 @@ export function MidnightDustWalletPanel({
     await handleConnect(balance.walletId)
   }
 
+  const connectedWalletInfo = wallets.find((w) => w.id === balance?.walletId) ?? null
+
   const inner = (
     <div className="space-y-4">
-      <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-        Connect to read your Midnight DUST wallet address, DUST balance, and
-        DUST cap. NIGHT stays in your Cardano wallet.
-      </p>
-
       {balance ? (
         <>
+          {/* Connected header — mirrors Cardano WalletConnectSection layout */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              {connectedWalletInfo?.icon ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  alt=""
+                  className="h-7 w-7 rounded-md object-contain"
+                  src={connectedWalletInfo.icon}
+                />
+              ) : null}
+              <div>
+                <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
+                  {balance.walletName}
+                </p>
+                <p className="mt-0.5 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-300">
+                  Midnight DUST address
+                </p>
+                <p className="mt-0.5 break-all font-mono text-xs font-semibold text-violet-900 dark:text-violet-100">
+                  {balance.dustAddress
+                    ? `${balance.dustAddress.slice(0, 20)}…${balance.dustAddress.slice(-6)}`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                Connected
+              </span>
+              <button
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                type="button"
+                onClick={() => onBalanceChange(null, null)}
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+
+          {/* Auto-refresh toggle — top-right, matches Cardano layout */}
           <div className="flex justify-end">
             <button
               type="button"
@@ -171,12 +209,6 @@ export function MidnightDustWalletPanel({
               value={formatDustRate(dustGrowthStatus, dustRate)}
               measuring={dustGrowthStatus === "checking"}
             />
-            <DustMetric
-              label="Wallet DUST address"
-              value={formatNullableValue(balance.dustAddress)}
-              className="col-span-3"
-              mono
-            />
           </div>
 
           <GenerationEta
@@ -193,10 +225,6 @@ export function MidnightDustWalletPanel({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-              {balance.walletName}
-            </span>
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {formatCheckedAt(balance.checkedAt)}
             </span>
@@ -210,17 +238,14 @@ export function MidnightDustWalletPanel({
                 {connecting ? "Refreshing..." : "Refresh"}
               </button>
             )}
-            <button
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              type="button"
-              onClick={() => onBalanceChange(null, null)}
-            >
-              Disconnect
-            </button>
           </div>
         </>
       ) : (
         <>
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Connect to read your Midnight DUST wallet address, DUST balance, and
+            DUST cap. NIGHT stays in your Cardano wallet.
+          </p>
           {wallets.length > 0 ? (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
