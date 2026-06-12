@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.3.0-rc.1] – 2026-06-12
+## [0.3.0] – 2026-06-12
 
 ### Added
 - Channel badge in the footer (`dev` / `rc` / empty = stable), driven by
