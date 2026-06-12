@@ -478,6 +478,14 @@ export function InspectorApp() {
               error={midnightWalletError}
               dustGrowthStatus={dustGrowthStatus}
               dustRate={dustRate}
+              generationNotice={
+                midnightDustBalance !== null &&
+                dustGrowthStatus === "stable" &&
+                dustRate === null &&
+                inspection?.status?.registered === true
+                  ? "DUST is generating per the Midnight indexer, but the amount is too small to detect in the 10-second measurement window. This is normal for very small NIGHT balances."
+                  : null
+              }
               onBalanceChange={(bal, err) => {
                 if (bal?.dustAddress !== midnightDustBalance?.dustAddress) {
                   setActiveRegistrationLookup({ status: "idle" })

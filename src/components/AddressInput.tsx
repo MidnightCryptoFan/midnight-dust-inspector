@@ -28,23 +28,27 @@ export function AddressInput({
           className="block text-sm font-semibold text-slate-950 dark:text-slate-100"
           htmlFor="stake-address"
         >
-          Cardano stake address
+          Cardano stake or payment address
         </label>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Paste the Cardano stake address for the wallet that holds your NIGHT
-          tokens. It starts with{" "}
+          Paste your Cardano stake address (
           <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-900 dark:bg-slate-800 dark:text-slate-100">
-            stake1
-          </code>{" "}
-          and can be found in your Cardano wallet under{" "}
+            stake1…
+          </code>
+          ) or a full payment address (
+          <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+            addr1…
+          </code>
+          ) — the stake key is extracted automatically. Stake addresses are shown
+          under{" "}
           <span className="font-medium text-slate-700 dark:text-slate-200">
             Receive
           </span>{" "}
           or{" "}
           <span className="font-medium text-slate-700 dark:text-slate-200">
             Account details
-          </span>
-          .
+          </span>{" "}
+          in your Cardano wallet.
         </p>
       </div>
 

@@ -163,6 +163,18 @@ export function CardanoInspectionPanel({
           }
         />
       )}
+      {timeline && timeline.scannedTransactionCount > 0 && (
+        <p className="text-xs text-slate-400 dark:text-slate-500">
+          {timeline.scannedTransactionCount}{" "}
+          {timeline.scannedTransactionCount === 1
+            ? "transaction"
+            : "transactions"}{" "}
+          scanned
+          {timeline.scannedTransactionCount > registrationEvents.length
+            ? ` · ${timeline.scannedTransactionCount - registrationEvents.length} not shown (no DUST or NIGHT activity detected)`
+            : ""}
+        </p>
+      )}
     </div>
   )
 }
