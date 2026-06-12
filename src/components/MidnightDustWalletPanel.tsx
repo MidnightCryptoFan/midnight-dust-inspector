@@ -161,41 +161,37 @@ export function MidnightDustWalletPanel({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-                Connected
-              </span>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                  Connected
+                </span>
+                <button
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  type="button"
+                  onClick={() => onBalanceChange(null, null)}
+                >
+                  Disconnect
+                </button>
+              </div>
               <button
-                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                 type="button"
-                onClick={() => onBalanceChange(null, null)}
+                onClick={() => setAutoRefresh((prev) => !prev)}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  autoRefresh
+                    ? "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-950/30 dark:text-green-400"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                }`}
               >
-                Disconnect
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    autoRefresh ? "animate-pulse bg-green-500" : "bg-slate-300 dark:bg-slate-600"
+                  }`}
+                />
+                {autoRefresh ? "Auto-refresh on · 60s" : "Auto-refresh"}
               </button>
             </div>
-          </div>
-
-          {/* Auto-refresh toggle — top-right, matches Cardano layout */}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setAutoRefresh((prev) => !prev)}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                autoRefresh
-                  ? "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-950/30 dark:text-green-400"
-                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  autoRefresh
-                    ? "animate-pulse bg-green-500"
-                    : "bg-slate-300 dark:bg-slate-600"
-                }`}
-              />
-              {autoRefresh ? "Auto-refresh on · 60s" : "Auto-refresh"}
-            </button>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
