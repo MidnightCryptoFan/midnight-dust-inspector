@@ -579,6 +579,22 @@ export function InspectorApp() {
         {/* 4. FAQ */}
         <FaqPanel />
 
+        {/* 5. Footer */}
+        <footer className="pb-2 text-center text-xs text-slate-400 dark:text-slate-600 space-y-0.5">
+          <p>
+            DUST Inspector{" "}
+            {process.env.NEXT_PUBLIC_APP_VERSION
+              ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
+              : ""}
+            {process.env.NEXT_PUBLIC_APP_CHANNEL ? (
+              <span className="ml-1.5 rounded-full border border-current px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                {process.env.NEXT_PUBLIC_APP_CHANNEL}
+              </span>
+            ) : null}
+          </p>
+          <p>Created by MidnightCryptoFan</p>
+        </footer>
+
         {/* Dev: mock scenario */}
         {mockModeEnabled && (
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
