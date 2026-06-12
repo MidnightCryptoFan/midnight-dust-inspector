@@ -110,6 +110,7 @@ export function CardanoInspectionPanel({
       <SummaryTiles
         nightSummary={nightSummary}
         effectiveState={effectiveState}
+        generationRate={indexerStatus?.generationRate ?? null}
       />
 
       {effectiveState.kind === "registered_active" && registeredDustAddress && (
@@ -181,20 +182,29 @@ export function CardanoInspectionPanel({
 
 // --- Summary tiles ---
 
+function formatIndexerRate(rate: string | null): string {
+  if (!rate) return "—"
+  if (rate === "pending") return "Pending"
+  const num = parseFloat(rate)
+  if (!isFinite(num) || num === 0) return "0 DUST/h"
+  return `${num.toLocaleString("en-US", { maximumFractionDigits: 4 })} DUST/h`
+}
+
 function SummaryTiles({
   nightSummary,
   effectiveState,
+  generationRate,
 }: {
   nightSummary: NightSummary
   effectiveState: EffectiveState
+  generationRate: string | null
 }) {
   const { unlockedTotal, lockedTotal, atomicUnitsPerNight, hasData } =
     nightSummary
   const hasVesting = lockedTotal > 0n
-  const cols = hasVesting ? "grid-cols-3" : "grid-cols-2"
 
   return (
-    <div className={`grid gap-2 ${cols}`}>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <MetricTile
         label="Night Balance"
         value={
@@ -212,6 +222,16 @@ function SummaryTiles({
           vestingSchedule={nightSummary.vestingSchedule}
         />
       )}
+      <MetricTile
+        label="DUST Rate"
+        value={formatIndexerRate(generationRate)}
+        sub="per indexer"
+        valueColor={
+          generationRate && parseFloat(generationRate) > 0
+            ? "text-violet-700 dark:text-violet-300"
+            : "text-slate-500 dark:text-slate-400"
+        }
+      />
       <RegistrationTile effectiveState={effectiveState} />
     </div>
   )
