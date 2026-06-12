@@ -592,7 +592,17 @@ export function InspectorApp() {
               </span>
             ) : null}
           </p>
-          <p>Created by MidnightCryptoFan</p>
+          <p>
+            Created by{" "}
+            <a
+              href="https://github.com/MidnightCryptoFan/midnight-dust-inspector"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-400"
+            >
+              MidnightCryptoFan
+            </a>
+          </p>
         </footer>
 
         {/* Dev: mock scenario */}

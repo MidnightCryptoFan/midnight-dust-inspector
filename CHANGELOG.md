@@ -5,7 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.3.0-rc.1] – 2026-06-12
+## [Unreleased] – 0.3.1
+
+### Added
+- GitHub repository link on "MidnightCryptoFan" in the footer
+
+### Fixed
+- `CARDANO_TIMELINE_TRANSACTION_LIMIT` in `.env.example` corrected from 25 to 100
+  to match the code default set in v0.2.0
+
+---
+
+## [0.3.0] – 2026-06-12
 
 ### Added
 - Channel badge in the footer (`dev` / `rc` / empty = stable), driven by
