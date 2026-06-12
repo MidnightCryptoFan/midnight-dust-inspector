@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
     // "dev" | "rc" | "" — set per branch; leave empty on main (stable).
-    NEXT_PUBLIC_APP_CHANNEL: "dev",
+    NEXT_PUBLIC_APP_CHANNEL: "",
   },
   // Lucid Evolution uses CML (Cardano Multiplatform Library) which is WASM-backed.
   // These packages must not be bundled server-side.
