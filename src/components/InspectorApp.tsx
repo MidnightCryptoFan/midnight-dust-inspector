@@ -435,13 +435,26 @@ export function InspectorApp() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
         {/* Header */}
         <header className="flex items-start justify-between py-2">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
-              Midnight DUST Inspector
-            </p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl">
-              DUST Dashboard
-            </h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-800">
+              <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7">
+                <rect x="3" y="3" width="4" height="4" fill="white" />
+                <rect x="3" y="10" width="4" height="4" fill="white" />
+                <rect x="3" y="17" width="4" height="4" fill="white" />
+                <path
+                  d="M12.8765 7H7V3.05761C13.5 3.05761 21 1.71441 21 11.9994C21 22.2845 14.2593 20.943 10.4074 20.9421V16.4708H12.8148C13.9383 16.4708 16.1852 16.9188 16.1852 11.9994C16.1852 7.52808 14 7 12.8765 7Z"
+                  fill="white"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                Midnight DUST Inspector
+              </p>
+              <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl">
+                DUST Dashboard
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <a
