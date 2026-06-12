@@ -946,6 +946,14 @@ function TransactionDetail({ txHash }: { txHash: string }) {
               ? "Copy failed"
               : "Copy"}
         </button>
+        <a
+          href={`https://cardanoscan.io/transaction/${txHash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          Cardanoscan ↗
+        </a>
       </dd>
     </div>
   )
