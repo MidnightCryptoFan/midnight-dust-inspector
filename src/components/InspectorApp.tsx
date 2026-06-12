@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { AddressInput } from "./AddressInput"
 import { CardanoInspectionPanel } from "./CardanoInspectionPanel"
 import { MidnightDustWalletPanel } from "./MidnightDustWalletPanel"
@@ -70,7 +71,9 @@ type InspectionState = {
 
 export function InspectorApp() {
   const mockModeEnabled = isMockIndexerEnabled()
-  const [address, setAddress] = useState("")
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [address, setAddress] = useState(() => searchParams.get("stake") ?? "")
   const [validationMessage, setValidationMessage] = useState<string | null>(
     null,
   )
@@ -99,6 +102,16 @@ export function InspectorApp() {
     initialBalance: bigint
     startedAt: number
   } | null>(null)
+
+  // Auto-submit when ?stake= is present in the URL on first load.
+  useEffect(() => {
+    const initialStake = searchParams.get("stake")
+    if (initialStake) {
+      void runInspection(initialStake)
+    }
+    // Run only once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!midnightDustBalance) {
@@ -216,6 +229,7 @@ export function InspectorApp() {
     setValidationMessage(null)
     setValidationNote(validation.note ?? null)
     setIsLoading(true)
+    router.replace(`?stake=${encodeURIComponent(validation.address)}`, { scroll: false })
 
     try {
       const [result, timelineResult] = await Promise.all([
