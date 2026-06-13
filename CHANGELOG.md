@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.1] – 2026-06-13
+
+### Fixed
+
+- TypeScript build error: `dustCapFull` prop missing in the preview page
+  `CardanoInspectionPanel` usage — caused Vercel production builds to fail
+
+---
+
 ## [0.5.0] – 2026-06-13
 
 ### Added

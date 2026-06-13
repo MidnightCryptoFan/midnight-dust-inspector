@@ -62,6 +62,7 @@ describe("CardanoInspectionPanel active source lookup", () => {
           outputIndex: 0,
         }}
         dustGrowthStatus="growing"
+        dustCapFull={false}
         indexerStatus={inactiveStatus}
         isOnChainLoading={false}
         midnightAddress="mn_dust1mockdustaddress000000000000000000000000"
@@ -113,6 +114,7 @@ describe("CardanoInspectionPanel active source lookup", () => {
             "No registration UTxO was found at the script address for this Midnight DUST address.",
         }}
         dustGrowthStatus="growing"
+        dustCapFull={false}
         indexerStatus={inactiveStatus}
         isOnChainLoading={false}
         midnightAddress="mn_dust1mockdustaddress000000000000000000000000"
@@ -179,6 +181,7 @@ describe("CardanoInspectionPanel registration history", () => {
       <CardanoInspectionPanel
         activeRegistrationLookup={{ status: "idle" }}
         dustGrowthStatus="stable"
+        dustCapFull={false}
         // Indexer says registered=true, but on-chain the UTxO is already spent.
         // This is the genuine conflict that triggers sync/support warnings.
         indexerStatus={activeStatus}
