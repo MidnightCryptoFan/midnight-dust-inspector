@@ -463,12 +463,12 @@ export function InspectorApp() {
               </svg>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl">
                 Midnight DUST Inspector
-              </p>
-              <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl">
-                DUST Dashboard
               </h1>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Check your DUST generation, cap, wallet link, and registration status.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -485,6 +485,11 @@ export function InspectorApp() {
             </span>
           </div>
         </header>
+
+        {/* Security notice */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+          This tool never asks for your seed phrase or private keys. Wallet connections are read-only unless you explicitly sign a registration transaction inside your wallet.
+        </div>
 
         {/* Modals */}
         {showDeregister && connectedWallet && inspection?.status && (
@@ -612,18 +617,17 @@ export function InspectorApp() {
           ) : (
             !isLoading && (
               <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                Connect a Cardano wallet above or enter a stake address to check
-                the registration state and NIGHT holdings.
+                Enter a Cardano stake address or connect your Cardano wallet to inspect your DUST generation.
               </p>
             )
           )}
         </section>
 
-        {/* 3. Tip */}
-        <TipPanel />
-
-        {/* 4. FAQ */}
+        {/* 3. FAQ */}
         <FaqPanel />
+
+        {/* 4. Support */}
+        <TipPanel />
 
         {/* 5. Footer */}
         <footer className="pb-2 text-center text-xs text-slate-400 dark:text-slate-600 space-y-0.5">
@@ -649,6 +653,7 @@ export function InspectorApp() {
               MidnightCryptoFan
             </a>
           </p>
+          <p>This is an independent tool and not an official Midnight Network product.</p>
         </footer>
 
         {/* Dev: mock scenario */}

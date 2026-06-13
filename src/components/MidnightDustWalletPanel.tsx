@@ -202,15 +202,18 @@ export function MidnightDustWalletPanel({
               label="DUST balance"
               value={formatDustQuantity(balance.balance)}
               accent
+              tooltip="Amount of DUST currently in your Midnight wallet."
             />
             <DustMetric
               label="DUST cap"
               value={formatDustQuantity(balance.cap)}
+              tooltip="Maximum DUST your wallet can hold. Calculated as 5× your unlocked NIGHT balance. Generation pauses when the cap is reached."
             />
             <DustMetric
               label="Generation rate"
               value={formatDustRate(dustGrowthStatus, dustRate)}
               measuring={dustGrowthStatus === "checking"}
+              tooltip="Speed at which your wallet is currently accumulating DUST, measured over a short window."
             />
           </div>
 
@@ -246,8 +249,10 @@ export function MidnightDustWalletPanel({
       ) : (
         <>
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-            Connect to read your Midnight DUST wallet address, DUST balance, and
-            DUST cap. NIGHT stays in your Cardano wallet.
+            Connect to read your Midnight DUST wallet address, DUST balance, and DUST cap.
+          </p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Your NIGHT remains in your Cardano wallet. DUST is generated for usage on Midnight and is not transferred from your wallet.
           </p>
           {wallets.length > 0 ? (
             <div className="space-y-2">
@@ -266,8 +271,8 @@ export function MidnightDustWalletPanel({
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               <p>
                 {isDiscovering
-                  ? "Looking for installed Midnight wallets. Unlock Lace if it is already open."
-                  : "No Midnight DApp Connector wallet detected. Unlock Lace or another compatible Midnight wallet, then scan again."}
+                  ? "Looking for installed Midnight wallets. Unlock your Midnight wallet extension if it is already open."
+                  : "No Midnight DApp Connector wallet detected. Unlock your Midnight wallet extension or install a compatible one, then scan again."}
               </p>
               <button
                 className="mt-3 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -422,6 +427,7 @@ function DustMetric({
   className = "",
   mono,
   measuring,
+  tooltip,
 }: {
   label: string
   value: string
@@ -429,9 +435,11 @@ function DustMetric({
   className?: string
   mono?: boolean
   measuring?: boolean
+  tooltip?: string
 }) {
   return (
     <div
+      title={tooltip}
       className={`rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800 ${className}`}
     >
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">

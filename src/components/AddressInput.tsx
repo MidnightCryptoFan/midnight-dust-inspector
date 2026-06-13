@@ -66,11 +66,11 @@ export function AddressInput({
           }
         />
         <button
-          className="min-h-12 rounded-md bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="min-h-12 rounded-md bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           type="submit"
           disabled={isLoading}
         >
-          {isLoading ? "Checking..." : "Check DUST status"}
+          {isLoading ? "Checking..." : "Check Stake Address"}
         </button>
       </div>
 

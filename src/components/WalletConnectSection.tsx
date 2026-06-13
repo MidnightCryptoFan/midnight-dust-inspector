@@ -151,6 +151,9 @@ export function WalletConnectSection({
         Connect to check your NIGHT balance, registration status, and manage
         registrations without any third-party app.
       </p>
+      <p className="text-xs text-slate-400 dark:text-slate-500">
+        You can inspect your status read-only. Registration actions require explicit wallet confirmation.
+      </p>
 
       {wallets.length > 0 ? (
         <div className="flex flex-wrap gap-2">
@@ -194,8 +197,11 @@ export function WalletConnectSection({
             type="button"
             onClick={() => handleConnect("lace")}
           >
-            Connect Lace
+            Connect Cardano Wallet
           </button>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            Lace, Eternl, Nami and other CIP-30 wallets
+          </p>
         </div>
       )}
 

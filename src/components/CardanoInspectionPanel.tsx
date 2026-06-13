@@ -233,6 +233,7 @@ function SummaryTiles({
             ? "text-violet-700 dark:text-violet-300"
             : "text-slate-500 dark:text-slate-400"
         }
+        tooltip="DUST Generation rate as reported by the Midnight indexer. Based on your unlocked NIGHT balance."
       />
       <RegistrationTile effectiveState={effectiveState} />
     </div>
@@ -244,14 +245,19 @@ function MetricTile({
   value,
   sub,
   valueColor,
+  tooltip,
 }: {
   label: string
   value: string
   sub: string
   valueColor: string
+  tooltip?: string
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800">
+    <div
+      title={tooltip}
+      className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800"
+    >
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
         {label}
       </dt>
@@ -387,7 +393,10 @@ function RegistrationTile({
       : config[effectiveState.kind]
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800">
+    <div
+      className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800"
+      title="Registration Status: whether your Cardano stake key is linked to a Midnight address for DUST generation."
+    >
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
         Active Registration
       </dt>
