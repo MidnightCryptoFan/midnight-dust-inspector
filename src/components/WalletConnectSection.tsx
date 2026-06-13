@@ -191,17 +191,6 @@ export function WalletConnectSection({
           >
             Scan again
           </button>
-          <button
-            className="ml-2 mt-3 rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:opacity-50 dark:border-blue-700 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-blue-950/60"
-            disabled={!!connecting}
-            type="button"
-            onClick={() => handleConnect("lace")}
-          >
-            Connect Cardano Wallet
-          </button>
-          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-            Lace, Eternl, Nami and other CIP-30 wallets
-          </p>
         </div>
       )}
 
