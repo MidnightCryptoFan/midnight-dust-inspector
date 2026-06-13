@@ -8,8 +8,16 @@ export type CardanoTransaction = {
 }
 
 export type CardanoTransactionDetails = CardanoTransaction & {
-  inputs: Array<{ address?: string; stakeAddress?: string | null; nightQuantity: string | null }>
-  outputs: Array<{ address: string; stakeAddress?: string | null; nightQuantity: string | null }>
+  inputs: Array<{
+    address?: string
+    stakeAddress?: string | null
+    nightQuantity: string | null
+  }>
+  outputs: Array<{
+    address: string
+    stakeAddress?: string | null
+    nightQuantity: string | null
+  }>
   metadata: unknown
 }
 

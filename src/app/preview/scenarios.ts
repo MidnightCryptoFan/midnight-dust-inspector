@@ -8,7 +8,8 @@ import type {
 
 const MOCK_STAKE = "stake1u9previewmockaddress000000000000000000000000"
 const MOCK_DUST = "dust1previewmockdustaddress000000000000000000"
-const MOCK_NIGHT_POLICY = "0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa"
+const MOCK_NIGHT_POLICY =
+  "0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa"
 const MOCK_NIGHT_ASSET = "4e49474854"
 // Real vesting script address — has the correct address type byte for isScriptPaymentAddress
 const VESTING_SCRIPT_ADDR =
@@ -34,9 +35,7 @@ function nightSnapshot(
   lockedQty?: string,
   vestingThawMs?: number,
 ): CardanoAccountSnapshot {
-  const totalQty = (
-    BigInt(unlockedQty) + BigInt(lockedQty ?? "0")
-  ).toString()
+  const totalQty = (BigInt(unlockedQty) + BigInt(lockedQty ?? "0")).toString()
 
   const lockedUtxo = lockedQty
     ? [
@@ -56,7 +55,8 @@ function nightSnapshot(
 
   const unlockedUtxo = [
     {
-      address: "addr1qymockpreviewaddress000000000000000000000000000000000000000",
+      address:
+        "addr1qymockpreviewaddress000000000000000000000000000000000000000",
       txHash: "mock-night-utxo-tx",
       txIndex: 0,
       quantity: unlockedQty,
@@ -142,7 +142,9 @@ function timeline(events: RegistrationEvent[]): RegistrationTimeline {
   return {
     stakeAddress: MOCK_STAKE,
     events: [...events].reverse(),
-    activeRegistrationCount: events.filter((e) => e.type === "registration_created").length,
+    activeRegistrationCount: events.filter(
+      (e) => e.type === "registration_created",
+    ).length,
     checkedAt: CHECKED_AT,
     source: "koios",
     scannedTransactionCount: 25,
@@ -192,9 +194,13 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "not-registered-with-night",
     title: "Not registered — NIGHT available",
-    description: "Wallet holds NIGHT but has not yet registered for DUST generation.",
+    description:
+      "Wallet holds NIGHT but has not yet registered for DUST generation.",
     snapshot: nightSnapshot("50000000000"),
-    indexerStatus: indexerStatus({ registered: false, nightBalance: "50000000000" }),
+    indexerStatus: indexerStatus({
+      registered: false,
+      nightBalance: "50000000000",
+    }),
     onChainState: { kind: "not_registered" },
     isOnChainLoading: false,
     dustGrowthStatus: "stable",
@@ -204,7 +210,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "registered-growing",
     title: "Registered — DUST growing",
-    description: "Healthy state. NIGHT is registered, DUST is actively generating.",
+    description:
+      "Healthy state. NIGHT is registered, DUST is actively generating.",
     snapshot: nightSnapshot("94114390552"),
     indexerStatus: indexerStatus({
       registered: true,
@@ -225,7 +232,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "registered-cap-full",
     title: "Registered — DUST cap reached",
-    description: "Registration active but DUST capacity is at zero. No new DUST is being generated.",
+    description:
+      "Registration active but DUST capacity is at zero. No new DUST is being generated.",
     snapshot: nightSnapshot("94114390552"),
     indexerStatus: indexerStatus({
       registered: true,
@@ -246,7 +254,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "deregistration-pending",
     title: "Deregistration pending",
-    description: "UTxO is already spent on-chain but the indexer hasn't caught up yet.",
+    description:
+      "UTxO is already spent on-chain but the indexer hasn't caught up yet.",
     snapshot: nightSnapshot("94114390552"),
     indexerStatus: indexerStatus({
       registered: true,
@@ -270,7 +279,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "vesting-countdown",
     title: "Airdrop Vesting — countdown",
-    description: "Locked NIGHT from airdrop vesting. Next thaw is in the future.",
+    description:
+      "Locked NIGHT from airdrop vesting. Next thaw is in the future.",
     snapshot: nightSnapshot(
       "88359765449",
       "5754625102",
@@ -320,7 +330,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "timeline-history",
     title: "Timeline — registration history",
-    description: "Multiple registration and deregistration events visible in the timeline.",
+    description:
+      "Multiple registration and deregistration events visible in the timeline.",
     snapshot: nightSnapshot("94114390552"),
     indexerStatus: indexerStatus({
       registered: true,
@@ -357,7 +368,8 @@ export const previewScenarios: PreviewScenario[] = [
   {
     id: "onchain-loading",
     title: "On-chain check loading",
-    description: "Indexer result is shown while the on-chain state is still being verified.",
+    description:
+      "Indexer result is shown while the on-chain state is still being verified.",
     snapshot: nightSnapshot("94114390552"),
     indexerStatus: indexerStatus({
       registered: true,

@@ -18,9 +18,7 @@ export default function PreviewPage() {
           returns 404 in production.
         </div>
 
-        <h1 className="text-xl font-bold text-slate-800">
-          UI State Preview
-        </h1>
+        <h1 className="text-xl font-bold text-slate-800">UI State Preview</h1>
 
         {previewScenarios.map((scenario) => (
           <ScenarioCard key={scenario.id} scenario={scenario} />
@@ -41,7 +39,9 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
       >
         <div>
           <p className="font-semibold text-slate-800">{scenario.title}</p>
-          <p className="mt-0.5 text-xs text-slate-500">{scenario.description}</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {scenario.description}
+          </p>
         </div>
         <span className="mt-0.5 text-slate-400">{open ? "▲" : "▼"}</span>
       </button>

@@ -6,11 +6,7 @@ import type {
   MidnightWalletError,
 } from "@/domain/midnightDustBalance"
 import { formatDustQuantity } from "@/domain/midnightDustBalance"
-import {
-  formatCheckedAt,
-  formatCompactAtomicQuantity,
-  formatNullableValue,
-} from "@/lib/formatting"
+import { formatCheckedAt, formatCompactAtomicQuantity } from "@/lib/formatting"
 import {
   detectInstalledMidnightWallets,
   readMidnightWalletDustBalance,
@@ -69,10 +65,6 @@ export function MidnightDustWalletPanel({
   }, [])
 
   useEffect(() => {
-    if (!balance) setAutoRefresh(false)
-  }, [balance])
-
-  useEffect(() => {
     if (!autoRefresh || !balance?.walletId) return
     const walletId = balance.walletId
     const id = window.setInterval(() => {
@@ -84,7 +76,7 @@ export function MidnightDustWalletPanel({
 
   async function handleConnect(
     walletId: string,
-    connectionMode: MidnightWalletConnectionMode = "mainnet",
+    connectionMode: MidnightWalletConnectionMode = "configured-network",
   ) {
     const attemptId = connectAttemptIdRef.current + 1
     connectAttemptIdRef.current = attemptId
@@ -101,6 +93,9 @@ export function MidnightDustWalletPanel({
     try {
       const result = await resultPromise
       if (connectAttemptIdRef.current === attemptId) {
+        if (!result.balance) {
+          setAutoRefresh(false)
+        }
         onBalanceChange(result.balance, result.error)
       }
     } finally {
@@ -127,7 +122,8 @@ export function MidnightDustWalletPanel({
     await handleConnect(balance.walletId)
   }
 
-  const connectedWalletInfo = wallets.find((w) => w.id === balance?.walletId) ?? null
+  const connectedWalletInfo =
+    wallets.find((w) => w.id === balance?.walletId) ?? null
 
   const inner = (
     <div className="space-y-4">
@@ -157,7 +153,9 @@ export function MidnightDustWalletPanel({
                       ? `${balance.dustAddress.slice(0, 20)}…${balance.dustAddress.slice(-6)}`
                       : "—"}
                   </span>
-                  {balance.dustAddress && <CopyButton text={balance.dustAddress} />}
+                  {balance.dustAddress && (
+                    <CopyButton text={balance.dustAddress} />
+                  )}
                 </div>
               </div>
             </div>
@@ -170,7 +168,10 @@ export function MidnightDustWalletPanel({
                 <button
                   className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                   type="button"
-                  onClick={() => onBalanceChange(null, null)}
+                  onClick={() => {
+                    setAutoRefresh(false)
+                    onBalanceChange(null, null)
+                  }}
                 >
                   Disconnect
                 </button>
@@ -186,7 +187,9 @@ export function MidnightDustWalletPanel({
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    autoRefresh ? "animate-pulse bg-green-500" : "bg-slate-300 dark:bg-slate-600"
+                    autoRefresh
+                      ? "animate-pulse bg-green-500"
+                      : "bg-slate-300 dark:bg-slate-600"
                   }`}
                 />
                 {autoRefresh ? "Auto-refresh on · 60s" : "Auto-refresh"}
@@ -199,15 +202,18 @@ export function MidnightDustWalletPanel({
               label="DUST balance"
               value={formatDustQuantity(balance.balance)}
               accent
+              tooltip="Amount of DUST currently in your Midnight wallet."
             />
             <DustMetric
               label="DUST cap"
               value={formatDustQuantity(balance.cap)}
+              tooltip="Maximum DUST your wallet can hold. Calculated as 5× your unlocked NIGHT balance. Generation pauses when the cap is reached."
             />
             <DustMetric
               label="Generation rate"
               value={formatDustRate(dustGrowthStatus, dustRate)}
               measuring={dustGrowthStatus === "checking"}
+              tooltip="Speed at which your wallet is currently accumulating DUST, measured over a short window."
             />
           </div>
 
@@ -243,8 +249,10 @@ export function MidnightDustWalletPanel({
       ) : (
         <>
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-            Connect to read your Midnight DUST wallet address, DUST balance, and
-            DUST cap. NIGHT stays in your Cardano wallet.
+            Connect to read your Midnight DUST wallet address, DUST balance, and DUST cap.
+          </p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Your NIGHT remains in your Cardano wallet. DUST is generated for usage on Midnight and is not transferred from your wallet.
           </p>
           {wallets.length > 0 ? (
             <div className="space-y-2">
@@ -263,8 +271,8 @@ export function MidnightDustWalletPanel({
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               <p>
                 {isDiscovering
-                  ? "Looking for installed Midnight wallets. Unlock Lace if it is already open."
-                  : "No Midnight DApp Connector wallet detected. Unlock Lace or another compatible Midnight wallet, then scan again."}
+                  ? "Looking for installed Midnight wallets. Unlock your Midnight wallet extension if it is already open."
+                  : "No Midnight DApp Connector wallet detected. Unlock your Midnight wallet extension or install a compatible one, then scan again."}
               </p>
               <button
                 className="mt-3 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -272,14 +280,6 @@ export function MidnightDustWalletPanel({
                 onClick={handleScanAgain}
               >
                 Scan again
-              </button>
-              <button
-                className="ml-2 mt-3 rounded-md border border-violet-200 bg-white px-2.5 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:border-violet-700 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/60"
-                disabled={!!connecting}
-                type="button"
-                onClick={() => handleConnect("lace", "mainnet")}
-              >
-                Connect Lace
               </button>
             </div>
           )}
@@ -379,7 +379,7 @@ function WalletConnectButtons({
         className="flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 transition hover:border-violet-300 hover:bg-violet-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-violet-700 dark:hover:bg-violet-950/40"
         disabled={!!connecting}
         type="button"
-        onClick={() => onConnect(wallet.id, "mainnet")}
+        onClick={() => onConnect(wallet.id)}
       >
         {wallet.icon ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -419,6 +419,7 @@ function DustMetric({
   className = "",
   mono,
   measuring,
+  tooltip,
 }: {
   label: string
   value: string
@@ -426,18 +427,18 @@ function DustMetric({
   className?: string
   mono?: boolean
   measuring?: boolean
+  tooltip?: string
 }) {
   return (
     <div
+      title={tooltip}
       className={`rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800 ${className}`}
     >
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
         {label}
       </dt>
       <dd
-        className={`mt-1 break-all text-sm ${
-          mono ? "font-mono text-xs" : ""
-        } ${
+        className={`mt-1 break-all text-sm ${mono ? "font-mono text-xs" : ""} ${
           measuring
             ? "flex items-center gap-1 text-slate-400 dark:text-slate-500"
             : accent
@@ -483,7 +484,8 @@ function GenerationEta({
     )
   }
 
-  if (dustGrowthStatus === "unchecked" || !dustRate || dustRate === 0n) return null
+  if (dustGrowthStatus === "unchecked" || !dustRate || dustRate === 0n)
+    return null
 
   let etaText: string | null = null
   try {
@@ -496,9 +498,10 @@ function GenerationEta({
         etaText = `Cap full in ~${hoursLeft}h`
       } else {
         const daysLeft = hoursLeft / 24n
-        etaText = daysLeft < 365n
-          ? `Cap full in ~${daysLeft} days`
-          : `Cap full in ${(daysLeft / 365n)}+ years`
+        etaText =
+          daysLeft < 365n
+            ? `Cap full in ~${daysLeft} days`
+            : `Cap full in ${daysLeft / 365n}+ years`
       }
     } else if (remaining <= 0n) {
       etaText = "Cap reached"

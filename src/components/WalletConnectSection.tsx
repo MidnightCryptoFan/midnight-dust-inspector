@@ -92,7 +92,8 @@ export function WalletConnectSection({
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
               <span className="font-mono text-xs font-semibold text-blue-900 dark:text-blue-100">
-                {connected.stakeAddress.slice(0, 20)}…{connected.stakeAddress.slice(-6)}
+                {connected.stakeAddress.slice(0, 20)}…
+                {connected.stakeAddress.slice(-6)}
               </span>
               <CopyButton text={connected.stakeAddress} />
             </div>
@@ -124,7 +125,9 @@ export function WalletConnectSection({
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  autoRefresh ? "animate-pulse bg-green-500" : "bg-slate-300 dark:bg-slate-600"
+                  autoRefresh
+                    ? "animate-pulse bg-green-500"
+                    : "bg-slate-300 dark:bg-slate-600"
                 }`}
               />
               {autoRefresh ? "Auto-refresh on · 60s" : "Auto-refresh"}
@@ -147,6 +150,9 @@ export function WalletConnectSection({
       <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
         Connect to check your NIGHT balance, registration status, and manage
         registrations without any third-party app.
+      </p>
+      <p className="text-xs text-slate-400 dark:text-slate-500">
+        You can inspect your status read-only. Registration actions require explicit wallet confirmation.
       </p>
 
       {wallets.length > 0 ? (
@@ -184,14 +190,6 @@ export function WalletConnectSection({
             onClick={handleScanAgain}
           >
             Scan again
-          </button>
-          <button
-            className="ml-2 mt-3 rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:opacity-50 dark:border-blue-700 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-blue-950/60"
-            disabled={!!connecting}
-            type="button"
-            onClick={() => handleConnect("lace")}
-          >
-            Connect Lace
           </button>
         </div>
       )}

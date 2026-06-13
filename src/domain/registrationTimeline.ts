@@ -1,7 +1,11 @@
 import type { CardanoAccountSnapshot } from "./cardanoAccount"
 
 export type RegistrationEvent = {
-  type: "registration_created" | "registration_removed" | "night_transfer" | "unknown"
+  type:
+    | "registration_created"
+    | "registration_removed"
+    | "night_transfer"
+    | "unknown"
   txHash: string
   blockTime: string | null
   stakeAddress: string
