@@ -56,6 +56,7 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
             walletConnected={false}
             midnightAddress={null}
             dustGrowthStatus={scenario.dustGrowthStatus}
+            dustCapFull={false}
             activeRegistrationLookup={{ status: "idle" }}
             timeline={scenario.timeline}
             timelineError={null}
