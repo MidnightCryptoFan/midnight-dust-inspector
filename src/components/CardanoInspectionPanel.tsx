@@ -51,6 +51,7 @@ type Props = {
   walletConnected: boolean
   midnightAddress: string | null
   dustGrowthStatus: DustGrowthStatus
+  dustCapFull: boolean
   activeRegistrationLookup: ActiveRegistrationLookup
   timeline: RegistrationTimeline | null
   timelineError: RegistrationTimelineError | null
@@ -70,6 +71,7 @@ export function CardanoInspectionPanel({
   walletConnected,
   midnightAddress,
   dustGrowthStatus,
+  dustCapFull,
   activeRegistrationLookup,
   timeline,
   timelineError,
@@ -140,6 +142,7 @@ export function CardanoInspectionPanel({
           walletConnected={walletConnected}
           midnightAddress={midnightAddress}
           dustGrowthStatus={dustGrowthStatus}
+          dustCapFull={dustCapFull}
           activeRegistrationLookup={activeRegistrationLookup}
           recentActivity={recentActivity}
           onRegister={onRegister}
@@ -506,6 +509,7 @@ function NotRegisteredActions({
   walletConnected,
   midnightAddress,
   dustGrowthStatus,
+  dustCapFull,
   activeRegistrationLookup,
   recentActivity,
   onRegister,
@@ -515,6 +519,7 @@ function NotRegisteredActions({
   walletConnected: boolean
   midnightAddress: string | null
   dustGrowthStatus: DustGrowthStatus
+  dustCapFull: boolean
   activeRegistrationLookup: ActiveRegistrationLookup
   recentActivity: RegistrationEvent | null
   onRegister: () => void
@@ -527,6 +532,7 @@ function NotRegisteredActions({
   const isLocked =
     dustIsGrowing ||
     dustIsChecking ||
+    dustCapFull ||
     recentActivity !== null ||
     !hasMidnightWallet
 
@@ -574,6 +580,15 @@ function NotRegisteredActions({
           recentActivity={recentActivity}
           onInspectActiveSource={onInspectActiveSource}
         />
+      )}
+
+      {dustCapFull && !dustIsGrowing && !dustIsChecking && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+          <p className="font-semibold">DUST cap is full — registration not needed right now.</p>
+          <p className="mt-1 text-xs">
+            Your Midnight wallet already holds the maximum DUST for your current NIGHT balance. No new DUST can be generated until you spend some DUST on the Midnight network. The registration status discrepancy may also be an indexer sync delay.
+          </p>
+        </div>
       )}
 
       {!dustIsGrowing && !dustIsChecking && recentActivity && (

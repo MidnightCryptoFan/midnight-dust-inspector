@@ -445,6 +445,19 @@ export function InspectorApp() {
     ? getRecentRegistrationActivity(inspection.registrationTimeline)
     : null
 
+  const dustCapFull = (() => {
+    try {
+      const bal = midnightDustBalance?.balance
+      const cap = midnightDustBalance?.cap
+      if (!bal || !cap) return false
+      const b = BigInt(bal)
+      const c = BigInt(cap)
+      return c > 0n && b >= c
+    } catch {
+      return false
+    }
+  })()
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -599,6 +612,7 @@ export function InspectorApp() {
                 walletConnected={!!connectedWallet}
                 midnightAddress={midnightDustBalance?.dustAddress ?? null}
                 dustGrowthStatus={dustGrowthStatus}
+                dustCapFull={dustCapFull}
                 activeRegistrationLookup={activeRegistrationLookup}
                 timeline={inspection.registrationTimeline}
                 timelineError={inspection.registrationTimelineError}
