@@ -281,14 +281,6 @@ export function MidnightDustWalletPanel({
               >
                 Scan again
               </button>
-              <button
-                className="ml-2 mt-3 rounded-md border border-violet-200 bg-white px-2.5 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:border-violet-700 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/60"
-                disabled={!!connecting}
-                type="button"
-                onClick={() => handleConnect("lace")}
-              >
-                Connect Lace
-              </button>
             </div>
           )}
 
