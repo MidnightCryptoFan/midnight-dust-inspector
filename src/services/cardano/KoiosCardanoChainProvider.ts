@@ -4,9 +4,7 @@ import type {
   CardanoUtxo,
   CardanoUtxoAsset,
 } from "@/domain/cardanoAccount"
-import {
-  DEFAULT_CARDANO_NIGHT_POLICY_ID,
-} from "@/domain/cardanoAccount"
+import { DEFAULT_CARDANO_NIGHT_POLICY_ID } from "@/domain/cardanoAccount"
 import type {
   CardanoChainProvider,
   CardanoTransaction,
@@ -135,7 +133,6 @@ const koiosTxInputSchema = z
   })
   .passthrough()
 
-
 const koiosTxInfoWithInputsSchema = z
   .object({
     tx_hash: z.string(),
@@ -208,7 +205,11 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
         headers,
         // _inputs: true is required — without it Koios omits the inputs array,
         // which prevents detection of de-registration (contract-spend) transactions.
-        body: JSON.stringify({ _tx_hashes: [txHash], _inputs: true, _assets: true }),
+        body: JSON.stringify({
+          _tx_hashes: [txHash],
+          _inputs: true,
+          _assets: true,
+        }),
         cache: "no-store",
       }),
     ])
@@ -489,7 +490,10 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
     }
 
     const stakeAddress = matchedPaymentKeyHash
-      ? await this.resolveStakeAddressFromTx(matchedTxHash, matchedPaymentKeyHash)
+      ? await this.resolveStakeAddressFromTx(
+          matchedTxHash,
+          matchedPaymentKeyHash,
+        )
       : null
 
     return {

@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest"
 import { validateStakeAddress } from "@/lib/validation"
+import { encodeBech32 } from "@/lib/bech32"
+
+const mainnetStakeAddress =
+  "stake1u8eseh2482k5e3a65sy9xsakzjl497zt5elwfh7q3u8k54g7yetxq"
+const testnetStakeAddress = encodeBech32("stake_test", [
+  0xe0,
+  ...Array.from({ length: 28 }, (_, index) => index + 1),
+])
 
 describe("validateStakeAddress", () => {
   test("rejects an empty address", () => {
@@ -9,19 +17,26 @@ describe("validateStakeAddress", () => {
   })
 
   test("accepts a likely mainnet stake address", () => {
-    const result = validateStakeAddress(
-      "stake1u9mockstakeaddress000000000000000000000000",
-    )
+    const result = validateStakeAddress(mainnetStakeAddress)
 
     expect(result.valid).toBe(true)
   })
 
-  test("accepts a likely testnet stake address", () => {
-    const result = validateStakeAddress(
-      "stake_test1u9mockstakeaddress000000000000000000000000",
-    )
+  test("accepts a valid testnet stake address with a mainnet note", () => {
+    const result = validateStakeAddress(testnetStakeAddress)
 
     expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.note).toMatch(/testnet/)
+    }
+  })
+
+  test("rejects a fake stake-looking address", () => {
+    const result = validateStakeAddress(
+      "stake1u9mockstakeaddress000000000000000000000000",
+    )
+
+    expect(result.valid).toBe(false)
   })
 
   test("rejects an invalid payment address prefix (not valid bech32)", () => {

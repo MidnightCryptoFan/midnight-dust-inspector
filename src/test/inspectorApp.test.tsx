@@ -13,6 +13,16 @@ import { inspectDustGenerationStatusFromApi } from "@/services/dustStatusApiClie
 import { inspectRegistrationTimelineFromApi } from "@/services/registrationTimelineApiClient"
 import { connectWallet } from "@/services/wallet/cip30"
 
+const navigationMocks = vi.hoisted(() => ({
+  replace: vi.fn(),
+  searchParams: new URLSearchParams(),
+}))
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: navigationMocks.replace }),
+  useSearchParams: () => navigationMocks.searchParams,
+}))
+
 vi.mock("@/services/midnightIndexerClient", () => ({
   inspectDustGenerationStatus: vi.fn(),
   isMockIndexerEnabled: () => false,
@@ -104,6 +114,8 @@ const cardanoNightSnapshot: CardanoAccountSnapshot = {
 
 afterEach(() => {
   cleanup()
+  navigationMocks.replace.mockReset()
+  navigationMocks.searchParams = new URLSearchParams()
   vi.restoreAllMocks()
 })
 

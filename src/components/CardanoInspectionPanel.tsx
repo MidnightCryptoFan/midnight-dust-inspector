@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
-import type { CardanoAccountSnapshot, VestingSchedule } from "@/domain/cardanoAccount"
+import type {
+  CardanoAccountSnapshot,
+  VestingSchedule,
+} from "@/domain/cardanoAccount"
 import type { OnChainRegistrationState } from "@/domain/onChainRegistration"
 import type { DustGenerationStatus } from "@/domain/dustStatus"
 import type {
@@ -48,6 +51,7 @@ type Props = {
   walletConnected: boolean
   midnightAddress: string | null
   dustGrowthStatus: DustGrowthStatus
+  dustCapFull: boolean
   activeRegistrationLookup: ActiveRegistrationLookup
   timeline: RegistrationTimeline | null
   timelineError: RegistrationTimelineError | null
@@ -67,6 +71,7 @@ export function CardanoInspectionPanel({
   walletConnected,
   midnightAddress,
   dustGrowthStatus,
+  dustCapFull,
   activeRegistrationLookup,
   timeline,
   timelineError,
@@ -92,9 +97,7 @@ export function CardanoInspectionPanel({
 
   // Newest first for display (timeline is built oldest-first for count logic).
   const registrationEvents = (
-    timeline?.events.filter(
-      (e) => e.type !== "unknown",
-    ) ?? []
+    timeline?.events.filter((e) => e.type !== "unknown") ?? []
   )
     .slice()
     .reverse()
@@ -139,6 +142,7 @@ export function CardanoInspectionPanel({
           walletConnected={walletConnected}
           midnightAddress={midnightAddress}
           dustGrowthStatus={dustGrowthStatus}
+          dustCapFull={dustCapFull}
           activeRegistrationLookup={activeRegistrationLookup}
           recentActivity={recentActivity}
           onRegister={onRegister}
@@ -232,6 +236,7 @@ function SummaryTiles({
             ? "text-violet-700 dark:text-violet-300"
             : "text-slate-500 dark:text-slate-400"
         }
+        tooltip="DUST Generation rate as reported by the Midnight indexer. Based on your unlocked NIGHT balance."
       />
       <RegistrationTile effectiveState={effectiveState} />
     </div>
@@ -243,14 +248,19 @@ function MetricTile({
   value,
   sub,
   valueColor,
+  tooltip,
 }: {
   label: string
   value: string
   sub: string
   valueColor: string
+  tooltip?: string
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800">
+    <div
+      title={tooltip}
+      className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800"
+    >
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
         {label}
       </dt>
@@ -311,7 +321,9 @@ function VestingTile({
       <dd className="mt-1 text-sm font-semibold text-amber-600 dark:text-amber-400">
         {amount}
       </dd>
-      <dd className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{sub}</dd>
+      <dd className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+        {sub}
+      </dd>
       {isClaimable && (
         <dd className="mt-1.5">
           <a
@@ -384,7 +396,10 @@ function RegistrationTile({
       : config[effectiveState.kind]
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800">
+    <div
+      className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800"
+      title="Registration Status: whether your Cardano stake key is linked to a Midnight address for DUST generation."
+    >
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
         Active Registration
       </dt>
@@ -494,6 +509,7 @@ function NotRegisteredActions({
   walletConnected,
   midnightAddress,
   dustGrowthStatus,
+  dustCapFull,
   activeRegistrationLookup,
   recentActivity,
   onRegister,
@@ -503,6 +519,7 @@ function NotRegisteredActions({
   walletConnected: boolean
   midnightAddress: string | null
   dustGrowthStatus: DustGrowthStatus
+  dustCapFull: boolean
   activeRegistrationLookup: ActiveRegistrationLookup
   recentActivity: RegistrationEvent | null
   onRegister: () => void
@@ -515,6 +532,7 @@ function NotRegisteredActions({
   const isLocked =
     dustIsGrowing ||
     dustIsChecking ||
+    dustCapFull ||
     recentActivity !== null ||
     !hasMidnightWallet
 
@@ -562,6 +580,15 @@ function NotRegisteredActions({
           recentActivity={recentActivity}
           onInspectActiveSource={onInspectActiveSource}
         />
+      )}
+
+      {dustCapFull && !dustIsGrowing && !dustIsChecking && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+          <p className="font-semibold">DUST cap is full — registration not needed right now.</p>
+          <p className="mt-1 text-xs">
+            Your Midnight wallet already holds the maximum DUST for your current NIGHT balance. No new DUST can be generated until you spend some DUST on the Midnight network. The registration status discrepancy may also be an indexer sync delay.
+          </p>
+        </div>
       )}
 
       {!dustIsGrowing && !dustIsChecking && recentActivity && (
@@ -813,7 +840,11 @@ function RegistrationEventList({
             // Only the most recent non-transfer event (index 0) can be in a sync conflict.
             eventWarning={
               index === 0
-                ? getRegistrationEventWarning({ event, effectiveState, referenceTime })
+                ? getRegistrationEventWarning({
+                    event,
+                    effectiveState,
+                    referenceTime,
+                  })
                 : null
             }
             isIndexerReported={
@@ -840,10 +871,12 @@ function RegistrationEventCard({
 }) {
   if (event.type === "night_transfer") {
     const isReceived = event.nightDirection === "received"
-    const formattedAmount =
-      event.nightAmount
-        ? formatCompactAtomicQuantity(BigInt(event.nightAmount), atomicUnitsPerNight)
-        : "?"
+    const formattedAmount = event.nightAmount
+      ? formatCompactAtomicQuantity(
+          BigInt(event.nightAmount),
+          atomicUnitsPerNight,
+        )
+      : "?"
     const badgeStyle = isReceived
       ? "bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-300"
       : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
@@ -853,12 +886,17 @@ function RegistrationEventCard({
           <p className="text-xs font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">
             {isReceived ? "NIGHT Received" : "NIGHT Sent"}
           </p>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle}`}>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle}`}
+          >
             {formattedAmount} NIGHT
           </span>
         </div>
         <dl className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
-          <EventDetail label="Block time" value={formatCheckedAt(event.blockTime)} />
+          <EventDetail
+            label="Block time"
+            value={formatCheckedAt(event.blockTime)}
+          />
           <TransactionDetail txHash={event.txHash} />
         </dl>
       </li>
