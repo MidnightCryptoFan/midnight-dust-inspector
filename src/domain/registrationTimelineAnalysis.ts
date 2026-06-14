@@ -190,23 +190,34 @@ function detectNightTransfer(
 
   const stakeAddrLower = userStakeAddress?.toLowerCase()
 
+  // Only count key-payment addresses (addr1q, addr1v). Vesting and other script
+  // addresses (addr1z, addr1w) embed the user's stake key but cannot be spent by
+  // the user directly, so including them inflates the apparent NIGHT movement.
+  const isKeyPayment = (addr: string) => {
+    const lower = addr.toLowerCase()
+    return lower.startsWith("addr1q") || lower.startsWith("addr1v")
+  }
+
   const isUserOutput = (out: {
     address: string
     stakeAddress?: string | null
   }) =>
-    userAddresses.has(out.address.toLowerCase()) ||
-    (stakeAddrLower != null &&
-      out.stakeAddress != null &&
-      out.stakeAddress.toLowerCase() === stakeAddrLower)
+    isKeyPayment(out.address) &&
+    (userAddresses.has(out.address.toLowerCase()) ||
+      (stakeAddrLower != null &&
+        out.stakeAddress != null &&
+        out.stakeAddress.toLowerCase() === stakeAddrLower))
 
   const isUserInput = (inp: {
     address?: string
     stakeAddress?: string | null
   }) =>
-    (inp.address != null && userAddresses.has(inp.address.toLowerCase())) ||
-    (stakeAddrLower != null &&
-      inp.stakeAddress != null &&
-      inp.stakeAddress.toLowerCase() === stakeAddrLower)
+    inp.address != null &&
+    isKeyPayment(inp.address) &&
+    (userAddresses.has(inp.address.toLowerCase()) ||
+      (stakeAddrLower != null &&
+        inp.stakeAddress != null &&
+        inp.stakeAddress.toLowerCase() === stakeAddrLower))
 
   let nightIn = 0n
   for (const output of details.outputs) {
@@ -236,27 +247,6 @@ function detectNightTransfer(
   if (net > 0n) return { amount: net.toString(), direction: "received" }
   if (net < 0n) return { amount: (-net).toString(), direction: "sent" }
 
-  // Net zero but NIGHT was involved — likely a vesting-contract release where the
-  // script address shares the user's stake key. Only count outputs to directly-owned
-  // payment addresses to avoid including the remaining locked vesting balance.
-  if (nightIn > 0n) {
-    let nightInDirect = 0n
-    for (const output of details.outputs) {
-      if (
-        output.nightQuantity &&
-        output.address != null &&
-        userAddresses.has(output.address.toLowerCase())
-      ) {
-        try {
-          nightInDirect += BigInt(output.nightQuantity)
-        } catch {
-          // ignore parse error
-        }
-      }
-    }
-    if (nightInDirect > 0n)
-      return { amount: nightInDirect.toString(), direction: "received" }
-  }
   return null
 }
 

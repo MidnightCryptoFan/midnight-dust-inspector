@@ -13,6 +13,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.2] – 2026-06-14
+
+### Fixed
+
+- NIGHT transfer amounts in the registration timeline showed inflated values
+  (e.g. 9.62k, 7.22k, 4.81k) instead of the correct single-tranche amount
+  (~2.41k). Vesting contract addresses (`addr1z…`) embed the user's stake key
+  and were therefore counted as user-owned outputs, inflating every release
+  event. Fixed by restricting NIGHT input/output accounting to key-payment
+  addresses (`addr1q`, `addr1v`) only — script-controlled addresses are now
+  excluded from the nightIn/nightOut calculation.
+
+---
+
 ## [0.5.1] – 2026-06-13
 
 ### Fixed
