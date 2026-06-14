@@ -236,8 +236,27 @@ function detectNightTransfer(
   if (net > 0n) return { amount: net.toString(), direction: "received" }
   if (net < 0n) return { amount: (-net).toString(), direction: "sent" }
 
-  // Net zero but NIGHT was involved — treat as received (internal move)
-  if (nightIn > 0n) return { amount: nightIn.toString(), direction: "received" }
+  // Net zero but NIGHT was involved — likely a vesting-contract release where the
+  // script address shares the user's stake key. Only count outputs to directly-owned
+  // payment addresses to avoid including the remaining locked vesting balance.
+  if (nightIn > 0n) {
+    let nightInDirect = 0n
+    for (const output of details.outputs) {
+      if (
+        output.nightQuantity &&
+        output.address != null &&
+        userAddresses.has(output.address.toLowerCase())
+      ) {
+        try {
+          nightInDirect += BigInt(output.nightQuantity)
+        } catch {
+          // ignore parse error
+        }
+      }
+    }
+    if (nightInDirect > 0n)
+      return { amount: nightInDirect.toString(), direction: "received" }
+  }
   return null
 }
 
