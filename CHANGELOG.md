@@ -5,11 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.5.3
+## [Unreleased] – 0.5.4
 
 ### Added
 
 - _(nothing yet)_
+
+---
+
+## [0.5.3] – 2026-06-14
+
+### Added
+
+- Client-side Koios fetching: timeline data is now requested directly from the
+  user's browser instead of routing through the Vercel server. Each user's own
+  IP is used for Koios API calls, eliminating the shared server-side rate-limit
+  problem. A server-side fallback is used automatically if the browser fetch fails.
+- In-memory cache with 60 s TTL and incremental refresh: the first lookup
+  fetches up to 100 transactions; subsequent refreshes within 60 s return cached
+  data with no Koios call. After 60 s only the latest 5 transaction hashes are
+  checked; a full re-fetch is only triggered when new transactions are found.
+
+### Fixed
+
+- Footer version no longer shows the pre-release suffix (`-dev`) duplicated
+  alongside the channel badge — e.g. "v0.5.3-devdev" now correctly shows
+  "v0.5.3 dev".
+- Stake key extracted from a payment address is now shown in truncated form in
+  the validation note (`stake1u8ese…etxq` style) to avoid wrapping on small screens.
 
 ---
 

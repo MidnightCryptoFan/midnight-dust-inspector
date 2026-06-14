@@ -33,7 +33,7 @@ import {
   type MockIndexerScenario,
   mockIndexerScenarios,
 } from "@/services/midnightIndexerClient"
-import { inspectRegistrationTimelineFromApi } from "@/services/registrationTimelineApiClient"
+import { inspectRegistrationTimelineCached } from "@/services/registrationTimelineCache"
 import { type ConnectedWallet } from "@/services/wallet/cip30"
 import { readMidnightWalletDustBalance } from "@/services/wallet/midnightDappConnector"
 import { WalletConnectSection } from "./WalletConnectSection"
@@ -257,7 +257,7 @@ export function InspectorApp() {
               cardanoAccountSnapshot: null,
               controlledError: null,
             })
-          : inspectRegistrationTimelineFromApi(validation.address),
+          : inspectRegistrationTimelineCached(validation.address),
       ])
 
       const registrationAddress = await resolveRegistrationAddress(

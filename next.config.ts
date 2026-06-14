@@ -6,7 +6,7 @@ const { version } = _require("./package.json") as { version: string }
 
 const nextConfig: NextConfig = {
   env: {
-    NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_APP_VERSION: version.replace(/-.*$/, ""),
     // "dev" | "rc" | "" — set per branch; leave empty on main (stable).
     NEXT_PUBLIC_APP_CHANNEL: process.env.NEXT_PUBLIC_APP_CHANNEL ?? "",
   },

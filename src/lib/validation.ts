@@ -53,7 +53,7 @@ export function validateStakeAddress(input: string): AddressValidationResult {
       return {
         valid: true,
         address: extracted,
-        note: `Stake key extracted from the payment address you entered: ${extracted}`,
+        note: `Stake key extracted from the payment address you entered: ${extracted.slice(0, 20)}...${extracted.slice(-13)}`,
       }
     }
     return {
