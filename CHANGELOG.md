@@ -5,11 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.5.5
+## [Unreleased] – 0.5.6
 
 ### Added
 
 - _(nothing yet)_
+
+---
+
+## [0.5.5] – 2026-06-24
+
+### Added
+
+- Required-signer hardening for registration: the registration transaction now
+  also declares the `c_wallet` payment key as a required signer, because the
+  minting policy runs the same `check_auth` as the spend (deregistration) path.
+
+### Changed
+
+- Removing multiple registrations now happens in a **single transaction**
+  (collect every selected script UTxO and burn `-N`) instead of several
+  back-to-back submissions, which could chain unconfirmed wallet inputs and
+  fail. The contract restricts minting to `+1` per transaction but does not
+  restrict the burn quantity.
+- Before signing a removal, each referenced UTxO is verified on-chain: it must
+  still exist unspent at the script address, hold the registration NFT, and
+  carry an inline datum whose `c_wallet` matches the connected wallet. Stale or
+  foreign UTxOs are now rejected up front instead of failing on-chain.
+
+### Fixed
+
+- The deregistration fallback no longer assumes output index `0` when only a
+  transaction hash is known — without a definite output index the UTxO is not
+  offered, since a UTxO is identified by `txHash` **and** `outputIndex`.
 
 ---
 
