@@ -25,19 +25,14 @@ type Registration = {
   matchesWallet: boolean
 }
 
-type RemovalResult = {
-  registration: Registration
-  success: boolean
-  txHash?: string
-  error?: string
-}
+type SelectionState = { registrations: Registration[]; selected: Set<string> }
 
 type FlowState =
   | { step: "loading" }
-  | { step: "select"; registrations: Registration[]; selected: Set<string> }
-  | { step: "signing"; total: number; current: number; results: RemovalResult[] }
-  | { step: "done"; results: RemovalResult[] }
-  | { step: "error"; message: string }
+  | ({ step: "select" } & SelectionState)
+  | { step: "signing"; count: number }
+  | { step: "done"; txHash: string; removed: Registration[] }
+  | { step: "error"; message: string; retry?: SelectionState }
 
 function refKey(r: { txHash: string; outputIndex: number }): string {
   return `${r.txHash}#${r.outputIndex}`
@@ -58,13 +53,14 @@ export function DeregisterFlow({
     : null
 
   // Fallback UTxO ref from the indexer / earlier scan, used when the live scan
-  // returns nothing (e.g. unparseable datum) but we still have a pointer.
+  // returns nothing but we still hold a pointer. A UTxO is only identified by
+  // txHash AND outputIndex, so a missing index is not guessed.
   const fallbackTxHash = utxoRef?.txHash ?? indexerStatus.utxoTxHash
   const fallbackOutputIndex =
     utxoRef?.outputIndex ??
     (indexerStatus.utxoOutputIndex != null
       ? Number(indexerStatus.utxoOutputIndex)
-      : 0)
+      : null)
 
   useEffect(() => {
     let cancelled = false
@@ -105,8 +101,14 @@ export function DeregisterFlow({
             }))
           : []
 
-        // No live UTxOs found, but we still hold a pointer — offer that one.
-        if (registrations.length === 0 && fallbackTxHash) {
+        // No live UTxOs found, but we still hold a complete pointer — offer it.
+        // Without a definite output index we do not guess one.
+        if (
+          registrations.length === 0 &&
+          fallbackTxHash &&
+          fallbackOutputIndex != null &&
+          Number.isFinite(fallbackOutputIndex)
+        ) {
           registrations = [
             {
               txHash: fallbackTxHash,
@@ -157,7 +159,7 @@ export function DeregisterFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function runRemoval(queue: Registration[]) {
+  async function runRemoval(state: SelectionState) {
     if (!wallet.paymentKeyHash) {
       setFlow({
         step: "error",
@@ -166,64 +168,34 @@ export function DeregisterFlow({
       return
     }
 
-    const { deregisterDust } = await import(
-      "@/services/cardano/dustTransactions.client"
-    )
-
-    const results: RemovalResult[] = []
-    for (let i = 0; i < queue.length; i++) {
-      const registration = queue[i]!
-      setFlow({
-        step: "signing",
-        total: queue.length,
-        current: i + 1,
-        results: [...results],
-      })
-
-      try {
-        const result = await deregisterDust(
-          wallet.rawApi,
-          wallet.paymentKeyHash,
-          {
-            txHash: registration.txHash,
-            outputIndex: registration.outputIndex,
-          },
-        )
-        results.push(
-          result.success
-            ? { registration, success: true, txHash: result.txHash }
-            : { registration, success: false, error: result.error },
-        )
-      } catch (error) {
-        results.push({
-          registration,
-          success: false,
-          error: error instanceof Error ? error.message : "Unknown error.",
-        })
-      }
-    }
-
-    setFlow({ step: "done", results })
-  }
-
-  function handleConfirmSelection() {
-    if (flow.step !== "select") return
-    const queue = flow.registrations.filter((r) =>
-      flow.selected.has(refKey(r)),
+    const queue = state.registrations.filter((r) =>
+      state.selected.has(refKey(r)),
     )
     if (queue.length === 0) return
-    void runRemoval(queue)
-  }
 
-  function handleDone() {
-    if (flow.step !== "done") return
-    const lastSuccess = [...flow.results]
-      .reverse()
-      .find((r) => r.success && r.txHash)
-    if (lastSuccess?.txHash) {
-      onSuccess(lastSuccess.txHash)
-    } else {
-      onCancel()
+    setFlow({ step: "signing", count: queue.length })
+
+    try {
+      const { deregisterDust } = await import(
+        "@/services/cardano/dustTransactions.client"
+      )
+      const result = await deregisterDust(
+        wallet.rawApi,
+        wallet.paymentKeyHash,
+        queue.map((r) => ({ txHash: r.txHash, outputIndex: r.outputIndex })),
+      )
+
+      if (result.success) {
+        setFlow({ step: "done", txHash: result.txHash, removed: queue })
+      } else {
+        setFlow({ step: "error", message: result.error, retry: state })
+      }
+    } catch (error) {
+      setFlow({
+        step: "error",
+        message: error instanceof Error ? error.message : "Unknown error.",
+        retry: state,
+      })
     }
   }
 
@@ -247,29 +219,32 @@ export function DeregisterFlow({
                 return { ...prev, selected: next }
               })
             }
-            onConfirm={handleConfirmSelection}
+            onConfirm={() =>
+              runRemoval({
+                registrations: flow.registrations,
+                selected: flow.selected,
+              })
+            }
             onCancel={onCancel}
           />
         ) : null}
 
-        {flow.step === "signing" ? (
-          <SigningStep total={flow.total} current={flow.current} />
-        ) : null}
+        {flow.step === "signing" ? <SigningStep count={flow.count} /> : null}
 
         {flow.step === "done" ? (
           <DoneStep
-            results={flow.results}
-            onRetryFailed={() =>
-              runRemoval(
-                flow.results.filter((r) => !r.success).map((r) => r.registration),
-              )
-            }
-            onDone={handleDone}
+            txHash={flow.txHash}
+            removed={flow.removed}
+            onClose={() => onSuccess(flow.txHash)}
           />
         ) : null}
 
         {flow.step === "error" ? (
-          <ErrorStep message={flow.message} onCancel={onCancel} />
+          <ErrorStep
+            message={flow.message}
+            onRetry={flow.retry ? () => setFlow({ step: "select", ...flow.retry! }) : undefined}
+            onCancel={onCancel}
+          />
         ) : null}
       </div>
     </div>
@@ -302,14 +277,17 @@ function LoadingStep() {
   )
 }
 
-function WarningBlock() {
+function WarningBlock({ multiple }: { multiple: boolean }) {
   return (
     <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
       <p className="font-semibold">Before you sign</p>
       <ul className="mt-1 list-disc space-y-1 pl-5">
-        <li>Each selected registration is removed in its own transaction.</li>
-        <li>Its registration NFT is burned and the script UTxO is spent.</li>
-        <li>Normal Cardano transaction fees apply per removal.</li>
+        {multiple ? (
+          <li>All selected registrations are removed in a single transaction.</li>
+        ) : (
+          <li>The registration NFT is burned and the script UTxO is spent.</li>
+        )}
+        <li>Normal Cardano transaction fees apply.</li>
         <li>
           The Midnight indexer may need hours, or sometimes longer, to show the
           updated status.
@@ -409,7 +387,7 @@ function SelectStep({
         })}
       </ul>
 
-      <WarningBlock />
+      <WarningBlock multiple={isMultiple} />
 
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
         <span className="font-semibold text-slate-950">Wallet: </span>
@@ -417,7 +395,7 @@ function SelectStep({
       </div>
 
       <p className="text-xs leading-5 text-slate-500">
-        Your wallet extension shows each transaction before signing. This app
+        Your wallet extension shows the transaction before signing. This app
         never asks for your seed phrase or private keys.
       </p>
 
@@ -448,7 +426,7 @@ function SelectStep({
   )
 }
 
-function SigningStep({ total, current }: { total: number; current: number }) {
+function SigningStep({ count }: { count: number }) {
   return (
     <div className="space-y-4 py-4 text-center">
       <div className="flex justify-center">
@@ -456,13 +434,12 @@ function SigningStep({ total, current }: { total: number; current: number }) {
       </div>
       <div>
         <p className="font-semibold text-slate-950">
-          Waiting for wallet signature
-          {total > 1 ? ` (${current} of ${total})` : ""}…
+          Waiting for wallet signature…
         </p>
         <p className="mt-1 text-sm text-slate-600">
           Confirm the transaction in your wallet extension.
-          {total > 1
-            ? " Each registration is removed in a separate transaction."
+          {count > 1
+            ? ` All ${count} registrations are removed in this one transaction.`
             : ""}
         </p>
       </div>
@@ -471,92 +448,69 @@ function SigningStep({ total, current }: { total: number; current: number }) {
 }
 
 function DoneStep({
-  results,
-  onRetryFailed,
-  onDone,
+  txHash,
+  removed,
+  onClose,
 }: {
-  results: RemovalResult[]
-  onRetryFailed: () => void
-  onDone: () => void
+  txHash: string
+  removed: Registration[]
+  onClose: () => void
 }) {
-  const succeeded = results.filter((r) => r.success)
-  const failed = results.filter((r) => !r.success)
-
   return (
     <div className="space-y-4">
       <div>
         <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">
-          {failed.length === 0 ? "Submitted" : "Partly submitted"}
+          Transaction submitted
         </p>
         <h2 className="mt-1 text-lg font-semibold text-slate-950">
-          {succeeded.length} of {results.length} removal
-          {results.length === 1 ? "" : "s"} submitted
+          {removed.length > 1
+            ? `${removed.length} registrations removed`
+            : "Registration removal was submitted"}
         </h2>
       </div>
 
-      <ul className="space-y-2">
-        {results.map((result) => (
-          <li
-            key={refKey(result.registration)}
-            className={`rounded-md border p-3 text-xs ${
-              result.success
-                ? "border-teal-200 bg-teal-50"
-                : "border-red-200 bg-red-50"
-            }`}
-          >
-            <p className="font-semibold">
-              {result.success ? "✓ Submitted" : "✗ Failed"} ·{" "}
-              {result.registration.dustAddress ??
-                `${result.registration.txHash.slice(0, 10)}…`}
-            </p>
-            <p className="mt-1 break-all font-mono text-[11px] text-slate-600">
-              {result.success ? result.txHash : result.error}
-            </p>
-          </li>
-        ))}
-      </ul>
+      <p className="text-sm leading-6 text-slate-600">
+        The transaction was submitted to Cardano. Wait for confirmation before
+        taking another action.
+      </p>
 
-      {succeeded.length > 0 && (
-        <div className="rounded-md border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
-          <p className="font-semibold">What happens next</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5">
-            <li>Wait for Cardano confirmation.</li>
-            <li>Run the inspector again after the transactions confirm.</li>
-            <li>
-              If the Midnight indexer still says registered, wait and check
-              again; indexer lag is common after registration changes.
-            </li>
-          </ul>
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        {failed.length > 0 && (
-          <button
-            className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            type="button"
-            onClick={onRetryFailed}
-          >
-            Retry {failed.length} failed
-          </button>
-        )}
-        <button
-          className="flex-1 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-          type="button"
-          onClick={onDone}
-        >
-          Done
-        </button>
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+        <p className="mb-1 text-xs font-semibold text-slate-950">
+          Transaction hash
+        </p>
+        <p className="break-all font-mono text-xs text-slate-600">{txHash}</p>
       </div>
+
+      <div className="rounded-md border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
+        <p className="font-semibold">What happens next</p>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          <li>Wait for Cardano confirmation.</li>
+          <li>Run the inspector again after the transaction confirms.</li>
+          <li>
+            If the Midnight indexer still says registered, wait and check again;
+            indexer lag is common after registration changes.
+          </li>
+        </ul>
+      </div>
+
+      <button
+        className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        type="button"
+        onClick={onClose}
+      >
+        Close
+      </button>
     </div>
   )
 }
 
 function ErrorStep({
   message,
+  onRetry,
   onCancel,
 }: {
   message: string
+  onRetry?: () => void
   onCancel: () => void
 }) {
   return (
@@ -567,9 +521,18 @@ function ErrorStep({
       <div className="break-all rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
         {message}
       </div>
-      <div className="flex justify-end">
+      <div className="flex gap-3">
+        {onRetry && (
+          <button
+            className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            type="button"
+            onClick={onRetry}
+          >
+            Back to selection
+          </button>
+        )}
         <button
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 ${onRetry ? "" : "flex-1"}`}
           type="button"
           onClick={onCancel}
         >
