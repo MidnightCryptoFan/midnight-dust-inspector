@@ -42,12 +42,23 @@ const REGISTRATION_SCRIPT = {
  * stops. The Midnight indexer may take hours to reflect the change.
  *
  * @param walletApi   The CIP-30 enabled wallet API (from ConnectedWallet.rawApi)
+ * @param paymentKeyHash  28-byte hex payment key hash registered as c_wallet.
+ *   The script's check_auth requires this key in the transaction's
+ *   extra_signatories (required_signers), so it must be declared explicitly.
  * @param registrationOutRef  The UTxO holding the registration NFT at the script
  */
 export async function deregisterDust(
   walletApi: WalletApi,
+  paymentKeyHash: string,
   registrationOutRef: OutRef,
 ): Promise<TxResult> {
+  if (paymentKeyHash.length !== 56) {
+    return {
+      success: false,
+      error: `Invalid payment key hash length: ${paymentKeyHash.length} chars (expected 56).`,
+    }
+  }
+
   try {
     const { Data, Constr } = await import("@lucid-evolution/lucid")
     const lucid = await buildLucid(walletApi)
@@ -72,6 +83,11 @@ export async function deregisterDust(
       .mintAssets({ [DUST_NFT_UNIT]: -1n }, burnRedeemer)
       .attach.SpendingValidator(REGISTRATION_SCRIPT)
       .attach.MintingPolicy(REGISTRATION_SCRIPT)
+      // The validator runs check_auth(c_wallet, extra_signatories, withdrawals).
+      // c_wallet is VerificationKey(paymentKeyHash), so this key must be a
+      // required signer for it to appear in extra_signatories; without it the
+      // script rejects the spend/burn.
+      .addSignerKey(paymentKeyHash)
       .complete()
 
     const signedTx = await tx.sign.withWallet().complete()

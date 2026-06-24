@@ -390,6 +390,25 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
   async findRegistrationUtxoForPaymentKey(
     paymentKeyHash: string,
   ): Promise<{ txHash: string; outputIndex: number } | null> {
+    const all = await this.findAllRegistrationUtxosForPaymentKey(paymentKeyHash)
+    const first = all[0]
+    return first ? { txHash: first.txHash, outputIndex: first.outputIndex } : null
+  }
+
+  /**
+   * Scans the DUST registration script address for ALL unspent UTxOs whose
+   * datum encodes the given payment key hash in the c_wallet field, returning
+   * each registration's UTxO reference and its registered DUST address.
+   *
+   * The same Cardano key can hold more than one active registration (DUST
+   * generation expects exactly one), so this is the source of truth for
+   * cleaning up multiple registrations — independent of the lagging indexer.
+   */
+  async findAllRegistrationUtxosForPaymentKey(
+    paymentKeyHash: string,
+  ): Promise<
+    Array<{ txHash: string; outputIndex: number; dustAddressHex: string | null }>
+  > {
     const response = await this.fetcher(`${this.baseUrl}/address_utxos`, {
       method: "POST",
       headers: {
@@ -410,23 +429,28 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
     }
 
     const parsed = koiosScriptUtxosSchema.parse(raw)
-
-    // Datum CBOR pattern: d8799f d8799f 581c <28-byte-payment-key-hash> ff ...
-    // d879 = CBOR tag 121 (Constr 0), 9f = indefinite array, 581c = 28-byte bytestring
     const lowerKey = paymentKeyHash.toLowerCase()
-    const keyPattern = new RegExp(`d8799fd8799f581c${lowerKey}ff`, "i")
+
+    const matches: Array<{
+      txHash: string
+      outputIndex: number
+      dustAddressHex: string | null
+    }> = []
 
     for (const utxo of parsed) {
       const datumBytes = utxo.inline_datum?.bytes
-      if (datumBytes && keyPattern.test(datumBytes)) {
-        return {
+      if (!datumBytes) continue
+      const datum = parseRegistrationDatum(datumBytes)
+      if (datum?.paymentKeyHash === lowerKey) {
+        matches.push({
           txHash: utxo.tx_hash,
           outputIndex: normalizeNumber(utxo.tx_index) ?? 0,
-        }
+          dustAddressHex: datum.dustAddressHex,
+        })
       }
     }
 
-    return null
+    return matches
   }
 
   /**
@@ -623,6 +647,47 @@ function normalizeNumber(
   const parsed = Number(value)
 
   return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Parses a DUST registration inline datum (hex) into its components.
+ *
+ * Datum layout: DustMappingDatum { c_wallet: VerificationKey(keyHash), dust_address }
+ *   d8799f          Constr 0, indefinite array (outer)
+ *     d8799f 581c <28-byte key hash> ff   VerificationKey(keyHash)
+ *     58 <len> <dust_address bytes>        byte string (Midnight address, <=33 bytes)
+ *   ff
+ *
+ * Returns the lowercased payment key hash and DUST address hex, or null if the
+ * datum does not match the expected shape.
+ */
+function parseRegistrationDatum(
+  datumHex: string,
+): { paymentKeyHash: string; dustAddressHex: string | null } | null {
+  const lower = datumHex.toLowerCase()
+  // d8799f d8799f 581c <56 hex = 28 bytes> ff
+  const keyMatch = lower.match(/d8799fd8799f581c([0-9a-f]{56})ff/)
+  if (!keyMatch || keyMatch.index == null) {
+    return null
+  }
+
+  const paymentKeyHash = keyMatch[1]!
+
+  // Immediately after the inner constr: a CBOR byte string 0x58 <len> <bytes>.
+  const afterKey = keyMatch.index + keyMatch[0].length
+  let dustAddressHex: string | null = null
+  if (lower.slice(afterKey, afterKey + 2) === "58") {
+    const len = parseInt(lower.slice(afterKey + 2, afterKey + 4), 16)
+    if (Number.isFinite(len) && len > 0) {
+      const start = afterKey + 4
+      const candidate = lower.slice(start, start + len * 2)
+      if (candidate.length === len * 2) {
+        dustAddressHex = candidate
+      }
+    }
+  }
+
+  return { paymentKeyHash, dustAddressHex }
 }
 
 function toCardanoAsset(

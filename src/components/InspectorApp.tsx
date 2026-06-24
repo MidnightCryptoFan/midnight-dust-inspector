@@ -509,6 +509,7 @@ export function InspectorApp() {
           <DeregisterFlow
             wallet={connectedWallet}
             indexerStatus={inspection.status}
+            midnightAddress={midnightDustBalance?.dustAddress ?? null}
             utxoRef={inspection.resolvedUtxoRef ?? undefined}
             onSuccess={(txHash) => {
               setShowDeregister(false)
