@@ -5,11 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.5.4
+## [Unreleased] – 0.5.5
 
 ### Added
 
 - _(nothing yet)_
+
+---
+
+## [0.5.4] – 2026-06-24
+
+### Added
+
+- The Deregister flow can now clean up **multiple DUST registrations** at once.
+  It scans the registration script directly for every active registration of
+  the connected wallet, lists each with its DUST address, and lets you remove
+  several in one pass — one transaction per registration, since the contract
+  burns exactly one registration token per transaction. The registration
+  matching your connected Midnight wallet is kept by default; duplicates are
+  pre-selected for removal, with a progress indicator while signing.
+
+### Fixed
+
+- Deregistration transactions now declare the registered `c_wallet` payment key
+  as a required signer. Without it the on-chain validator's `check_auth` check
+  rejected the spend and burn, so a deregistration could never be submitted.
 
 ---
 
