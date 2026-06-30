@@ -1,6 +1,6 @@
 {
   "name": "midnight-dust-inspector",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "license": "GPL-3.0-only",
   "scripts": {
     "dev": "next dev -p 3000",
