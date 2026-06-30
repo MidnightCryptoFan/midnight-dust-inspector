@@ -5,11 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.5.7
+## [Unreleased] – 0.5.8
 
 ### Added
 
 - _(nothing yet)_
+
+---
+
+## [0.5.7] – 2026-06-30
+
+### Fixed
+
+- The "Clean up registrations" modal now opens in all cases where multiple
+  registrations are detected, including when the Midnight indexer returns a
+  generic error (not the specific "Multiple Registrations detected" signal)
+  but the Cardano timeline already shows `activeRegistrationCount > 1`. The
+  modal gate condition is now fully consistent with the `multipleRegistrations`
+  prop that controls the button visibility.
 
 ---
 
