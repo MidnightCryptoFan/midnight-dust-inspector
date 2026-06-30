@@ -505,7 +505,7 @@ export function InspectorApp() {
         </div>
 
         {/* Modals */}
-        {showDeregister && connectedWallet && inspection?.status && (
+        {showDeregister && connectedWallet && (inspection?.status != null || inspection?.diagnosis?.code === "MULTIPLE_REGISTRATIONS_DETECTED") && (
           <DeregisterFlow
             wallet={connectedWallet}
             indexerStatus={inspection.status}
@@ -614,6 +614,7 @@ export function InspectorApp() {
                 midnightAddress={midnightDustBalance?.dustAddress ?? null}
                 dustGrowthStatus={dustGrowthStatus}
                 dustCapFull={dustCapFull}
+                multipleRegistrations={inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED"}
                 activeRegistrationLookup={activeRegistrationLookup}
                 timeline={inspection.registrationTimeline}
                 timelineError={inspection.registrationTimelineError}

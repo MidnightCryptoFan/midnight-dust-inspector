@@ -8,7 +8,7 @@ import { decodeBech32, bytesToHex } from "@/lib/bech32"
 
 type Props = {
   wallet: ConnectedWallet
-  indexerStatus: DustGenerationStatus
+  indexerStatus: DustGenerationStatus | null
   /** Connected Midnight DUST address (mn_dust1…), used to mark which registration to keep. */
   midnightAddress?: string | null
   utxoRef?: { txHash: string; outputIndex: number }
@@ -55,10 +55,10 @@ export function DeregisterFlow({
   // Fallback UTxO ref from the indexer / earlier scan, used when the live scan
   // returns nothing but we still hold a pointer. A UTxO is only identified by
   // txHash AND outputIndex, so a missing index is not guessed.
-  const fallbackTxHash = utxoRef?.txHash ?? indexerStatus.utxoTxHash
+  const fallbackTxHash = utxoRef?.txHash ?? indexerStatus?.utxoTxHash ?? null
   const fallbackOutputIndex =
     utxoRef?.outputIndex ??
-    (indexerStatus.utxoOutputIndex != null
+    (indexerStatus?.utxoOutputIndex != null
       ? Number(indexerStatus.utxoOutputIndex)
       : null)
 
@@ -113,7 +113,7 @@ export function DeregisterFlow({
             {
               txHash: fallbackTxHash,
               outputIndex: fallbackOutputIndex,
-              dustAddress: indexerStatus.dustAddress,
+              dustAddress: indexerStatus?.dustAddress ?? null,
               dustAddressHex: null,
               matchesWallet: false,
             },

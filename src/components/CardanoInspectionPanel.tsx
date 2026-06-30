@@ -52,6 +52,7 @@ type Props = {
   midnightAddress: string | null
   dustGrowthStatus: DustGrowthStatus
   dustCapFull: boolean
+  multipleRegistrations: boolean
   activeRegistrationLookup: ActiveRegistrationLookup
   timeline: RegistrationTimeline | null
   timelineError: RegistrationTimelineError | null
@@ -72,6 +73,7 @@ export function CardanoInspectionPanel({
   midnightAddress,
   dustGrowthStatus,
   dustCapFull,
+  multipleRegistrations,
   activeRegistrationLookup,
   timeline,
   timelineError,
@@ -137,7 +139,14 @@ export function CardanoInspectionPanel({
         <DeregistrationPendingNote onRefresh={onRefresh} />
       )}
 
-      {effectiveState.kind === "not_registered" && (
+      {effectiveState.kind === "not_registered" && multipleRegistrations && (
+        <MultipleRegistrationsActions
+          walletConnected={walletConnected}
+          onDeregister={onDeregister}
+        />
+      )}
+
+      {effectiveState.kind === "not_registered" && !multipleRegistrations && (
         <NotRegisteredActions
           walletConnected={walletConnected}
           midnightAddress={midnightAddress}
@@ -499,6 +508,41 @@ function ActiveActions({
       ) : (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Connect your Cardano wallet to deregister.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function MultipleRegistrationsActions({
+  walletConnected,
+  onDeregister,
+}: {
+  walletConnected: boolean
+  onDeregister: () => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+        <p className="font-semibold">Multiple active registrations detected</p>
+        <p className="mt-1 text-xs">
+          The Midnight indexer found more than one registration for this stake
+          address. DUST generation needs exactly one destination. Use the button
+          below to scan all active registrations on-chain and remove the
+          duplicates in a single transaction.
+        </p>
+      </div>
+      {walletConnected ? (
+        <button
+          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+          type="button"
+          onClick={onDeregister}
+        >
+          Clean up registrations
+        </button>
+      ) : (
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Connect your Cardano wallet to remove duplicate registrations.
         </p>
       )}
     </div>
