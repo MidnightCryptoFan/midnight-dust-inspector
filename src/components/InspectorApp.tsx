@@ -614,7 +614,10 @@ export function InspectorApp() {
                 midnightAddress={midnightDustBalance?.dustAddress ?? null}
                 dustGrowthStatus={dustGrowthStatus}
                 dustCapFull={dustCapFull}
-                multipleRegistrations={inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED"}
+                multipleRegistrations={
+                  inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED" ||
+                  (inspection.registrationTimeline?.activeRegistrationCount ?? 0) > 1
+                }
                 activeRegistrationLookup={activeRegistrationLookup}
                 timeline={inspection.registrationTimeline}
                 timelineError={inspection.registrationTimelineError}
