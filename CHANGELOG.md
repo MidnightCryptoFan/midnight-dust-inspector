@@ -5,11 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.5.6
+## [Unreleased] – 0.5.7
 
 ### Added
 
 - _(nothing yet)_
+
+---
+
+## [0.5.6] – 2026-06-30
+
+### Fixed
+
+- When the Midnight indexer reports "Multiple Registrations detected", the
+  Deregister flow is now accessible. Previously `inspection.status` being null
+  caused the modal gate to block the flow entirely, leaving the user with no
+  path to clean up duplicate registrations.
+- The multiple-registrations warning and "Clean up registrations" button are now
+  also derived from the Cardano on-chain timeline (`activeRegistrationCount > 1`)
+  independently of the indexer error. This means the cleanup UI appears even
+  when the indexer is lagging or does not report an explicit error, as long as
+  the Cardano transaction history shows more than one active registration.
 
 ---
 
