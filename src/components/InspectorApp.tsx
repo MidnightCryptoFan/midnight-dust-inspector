@@ -505,7 +505,11 @@ export function InspectorApp() {
         </div>
 
         {/* Modals */}
-        {showDeregister && connectedWallet && (inspection?.status != null || inspection?.diagnosis?.code === "MULTIPLE_REGISTRATIONS_DETECTED") && (
+        {showDeregister && connectedWallet && inspection != null && (
+          inspection.status != null ||
+          inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED" ||
+          (inspection.registrationTimeline?.activeRegistrationCount ?? 0) > 1
+        ) && (
           <DeregisterFlow
             wallet={connectedWallet}
             indexerStatus={inspection.status}
