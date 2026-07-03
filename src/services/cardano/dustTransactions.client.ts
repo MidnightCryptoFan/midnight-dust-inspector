@@ -47,27 +47,23 @@ const REGISTRATION_SCRIPT = {
  *
  * Before building, every referenced UTxO is verified to (a) still exist
  * unspent at the script address, (b) hold exactly the registration NFT, and
- * (c) carry an inline datum whose c_wallet equals `paymentKeyHash` — so a
- * stale or foreign UTxO is rejected up front instead of failing on-chain.
+ * (c) carry a readable registration datum.
+ *
+ * The script's check_auth requires the datum's own c_wallet key in the
+ * transaction's extra_signatories, so each registration's key is read from its
+ * datum and declared as a required signer. That key is often NOT the wallet's
+ * current change key (multi-address wallets rotate payment keys), so the
+ * current change key must never be assumed. The wallet signs with every
+ * required key it controls; if it does not control one, submission fails and
+ * the error names the missing key.
  *
  * @param walletApi   The CIP-30 enabled wallet API (from ConnectedWallet.rawApi)
- * @param paymentKeyHash  28-byte hex payment key hash registered as c_wallet.
- *   The script's check_auth requires this key in the transaction's
- *   extra_signatories (required_signers), so it must be declared explicitly.
  * @param registrationOutRefs  The registration UTxOs to remove (at least one).
  */
 export async function deregisterDust(
   walletApi: WalletApi,
-  paymentKeyHash: string,
   registrationOutRefs: OutRef[],
 ): Promise<TxResult> {
-  if (paymentKeyHash.length !== 56) {
-    return {
-      success: false,
-      error: `Invalid payment key hash length: ${paymentKeyHash.length} chars (expected 56).`,
-    }
-  }
-
   if (registrationOutRefs.length === 0) {
     return { success: false, error: "No registration UTxO was selected." }
   }
@@ -86,7 +82,7 @@ export async function deregisterDust(
       }
     }
 
-    const lowerKey = paymentKeyHash.toLowerCase()
+    const requiredSignerKeys = new Set<string>()
     for (const utxo of utxos) {
       const ref = `${utxo.txHash}#${utxo.outputIndex}`
 
@@ -104,12 +100,7 @@ export async function deregisterDust(
           error: `UTxO ${ref} does not carry a readable registration datum.`,
         }
       }
-      if (parsed.paymentKeyHash !== lowerKey) {
-        return {
-          success: false,
-          error: `UTxO ${ref} is registered to a different wallet key and cannot be removed with this wallet.`,
-        }
-      }
+      requiredSignerKeys.add(parsed.paymentKeyHash)
     }
 
     // Spend redeemer: Constr 0 [] = d87980
@@ -117,18 +108,21 @@ export async function deregisterDust(
     // Burn redeemer: Constr 1 [] = d87a80
     const burnRedeemer = Data.to(new Constr(1, []))
 
-    const tx = await lucid
+    let txBuilder = lucid
       .newTx()
       .collectFrom(utxos, spendRedeemer)
       .mintAssets({ [DUST_NFT_UNIT]: BigInt(-utxos.length) }, burnRedeemer)
       .attach.SpendingValidator(REGISTRATION_SCRIPT)
       .attach.MintingPolicy(REGISTRATION_SCRIPT)
-      // The validator runs check_auth(c_wallet, extra_signatories, withdrawals).
-      // c_wallet is VerificationKey(paymentKeyHash), so this key must be a
-      // required signer for it to appear in extra_signatories; without it the
-      // script rejects the spend/burn.
-      .addSignerKey(paymentKeyHash)
-      .complete()
+
+    // The validator runs check_auth(c_wallet, extra_signatories, withdrawals)
+    // per spent registration, so every datum's c_wallet key must be a required
+    // signer; without it the script rejects the spend/burn.
+    for (const key of requiredSignerKeys) {
+      txBuilder = txBuilder.addSignerKey(key)
+    }
+
+    const tx = await txBuilder.complete()
 
     const signedTx = await tx.sign.withWallet().complete()
     const txHash = await signedTx.submit()
@@ -208,9 +202,17 @@ export async function registerDust(
 // Helpers
 
 function formatError(err: unknown): string {
-  if (err instanceof Error) {
-    // Strip long CBOR hex from error messages
-    return err.message.replace(/[0-9a-f]{40,}/gi, "[hex...]")
+  const message = err instanceof Error ? err.message : String(err)
+
+  // A missing vkey witness means a registration's c_wallet key is not
+  // controlled by the connected wallet — say so instead of dumping CBOR.
+  if (/MissingVKeyWitnesses|missing.*witness/i.test(message)) {
+    return (
+      "The registration is bound to a payment key this wallet did not sign with. " +
+      "Connect the wallet (or account) that created the registration and try again."
+    )
   }
-  return String(err)
+
+  // Strip long CBOR hex from error messages
+  return message.replace(/[0-9a-f]{40,}/gi, "[hex...]")
 }

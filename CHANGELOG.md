@@ -7,9 +7,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] – 0.5.8
 
-### Added
+### Fixed
 
-- _(nothing yet)_
+- **Deregistration now finds every registration of the stake account, not just
+  the one matching the wallet's current change key.** The history view always
+  identified the user by stake account, but deletion searched the script
+  datums for a single payment key hash — the current change address key.
+  Multi-address wallets rotate payment keys, so registrations created earlier
+  (often with a then-unused change key that never appeared on-chain) were
+  shown in the history but reported as "No active registration UTxO was found"
+  when the user tried to remove them. Discovery now matches (a) every payment
+  key the wallet reports, (b) the payment credential of every on-chain address
+  of the stake account, and (c) any unspent registration UTxO created by a
+  transaction of the stake account.
+- **Koios pagination.** Koios silently truncates every response at 1000 rows;
+  the DUST registration script now holds 3000+ UTxOs, so single-request scans
+  missed registrations beyond the first page. All potentially large Koios
+  queries (script scan, account addresses/assets/transactions, address UTxOs)
+  now follow pagination — remaining pages are fetched in parallel using the
+  Content-Range row count, with a sequential tail guard.
+- **Deregistration required signers are read from each registration's datum.**
+  The spend validator's `check_auth` demands the datum's own `c_wallet` key in
+  `extra_signatories`; the builder previously always declared the wallet's
+  current change key, which fails for registrations bound to an older key.
+  Each selected UTxO's datum key is now declared, and a missing-witness error
+  is reported as a clear message instead of raw CBOR.
+- The on-chain registration cross-check works without a connected wallet now
+  (it scans by stake account) and no longer reports "deregistration pending"
+  for accounts whose registration is bound to a rotated key.
+- Script payment credentials (addr1z…/odd address types) are no longer treated
+  as signable payment keys when deriving key hashes from addresses.
+
+### Changed
+
+- `deregisterDust` drops its `paymentKeyHash` parameter — required signers are
+  derived per UTxO from the on-chain datum.
+- `/api/active-registrations` accepts `stakeAddress` and `paymentKeyHashes[]`
+  (the legacy single `paymentKeyHash` is still accepted) and returns each
+  registration's `cWalletKeyHash` plus an `ownedByWallet` flag; the removal
+  dialog explains when a registration is bound to an older key.
+- Koios-backed API routes declare `maxDuration = 300` so slow multi-page scans
+  are not killed at the platform's default function timeout.
 
 ---
 

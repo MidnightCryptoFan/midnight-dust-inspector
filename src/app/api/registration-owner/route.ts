@@ -2,6 +2,10 @@ import { z } from "zod"
 import { KoiosCardanoChainProvider } from "@/services/cardano/KoiosCardanoChainProvider"
 import { tryDecodeAnyBech32 } from "@/lib/bech32"
 
+// The paginated script scan can take well over a minute when Koios is slow;
+// without this the serverless function is killed at the platform default.
+export const maxDuration = 300
+
 const requestSchema = z.object({
   dustAddress: z.string().min(10),
 })

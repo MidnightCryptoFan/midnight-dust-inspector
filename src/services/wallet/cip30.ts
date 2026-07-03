@@ -22,6 +22,13 @@ export type ConnectedWallet = {
   stakeAddress: string
   /** Hex payment key hash (28 bytes). Used to build the c_wallet credential in the registration datum. */
   paymentKeyHash: string | null
+  /**
+   * Every payment key hash the wallet reports (change + used + unused
+   * addresses, deduplicated, change address first). Multi-address wallets
+   * rotate payment keys under the same stake key, so an on-chain registration
+   * may reference any of these — never just the current change key.
+   */
+  paymentKeyHashes: string[]
   /** Raw CIP-30 wallet API used for signing and submitting transactions. Browser-only. */
   rawApi: WalletApi
 }
@@ -67,7 +74,7 @@ export async function connectWallet(
     "The Cardano wallet did not answer the connection request in time.",
   )
   const stakeAddress = await extractStakeAddress(api)
-  const paymentKeyHash = await extractPaymentKeyHash(api)
+  const paymentKeyHashes = await extractPaymentKeyHashes(api)
 
   return {
     info: {
@@ -76,7 +83,8 @@ export async function connectWallet(
       icon: handle.icon || "",
     },
     stakeAddress,
-    paymentKeyHash,
+    paymentKeyHash: paymentKeyHashes[0] ?? null,
+    paymentKeyHashes,
     rawApi: api,
   }
 }
@@ -118,18 +126,24 @@ async function readBaseAddressCandidates(api: WalletApi): Promise<string[]> {
   )
 }
 
-async function extractPaymentKeyHash(api: WalletApi): Promise<string | null> {
+async function extractPaymentKeyHashes(api: WalletApi): Promise<string[]> {
   try {
     const [changeAddress, used, unused] = await Promise.all([
       readWalletAddress(() => api.getChangeAddress()),
       readWalletAddresses(() => api.getUsedAddresses()),
       readWalletAddresses(() => api.getUnusedAddresses()),
     ])
-    const firstAddr = changeAddress ?? used[0] ?? unused[0]
-    if (!firstAddr) return null
-    return paymentKeyHashFromAddressHex(firstAddr)
+    const hashes: string[] = []
+    for (const address of [changeAddress, ...used, ...unused]) {
+      if (!address) continue
+      const hash = paymentKeyHashFromAddressHex(address)
+      if (hash && !hashes.includes(hash)) {
+        hashes.push(hash)
+      }
+    }
+    return hashes
   } catch {
-    return null
+    return []
   }
 }
 
@@ -166,6 +180,8 @@ export function stakeAddressFromBaseAddress(address: string): string | null {
 /**
  * Extracts the 28-byte payment key hash from a Cardano base address.
  * Accepts both hex (from CIP-30) and bech32 (addr1...) formats.
+ * Returns null for script payment credentials (odd Shelley address types) —
+ * those hashes are not verification keys and can never sign a transaction.
  */
 export function paymentKeyHashFromAddressHex(
   addressHex: string,
@@ -180,6 +196,8 @@ export function paymentKeyHashFromAddressHex(
     const headerByte = bytes[0]!
     const addressType = (headerByte & 0xf0) >> 4
     if (addressType > 7) return null
+    // Odd address types carry a script hash as payment credential.
+    if ((addressType & 1) === 1) return null
 
     return bytesToHex(bytes.slice(1, 29))
   } catch {

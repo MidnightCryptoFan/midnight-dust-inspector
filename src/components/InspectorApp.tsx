@@ -192,20 +192,20 @@ export function InspectorApp() {
   useEffect(() => {
     if (!autoRefresh || !inspection?.stakeAddress) return
     const stakeAddress = inspection.stakeAddress
-    const paymentKeyHash = connectedWallet?.paymentKeyHash ?? null
+    const paymentKeyHashes = connectedWallet?.paymentKeyHashes ?? null
     const id = window.setInterval(() => {
-      void runInspection(stakeAddress, { paymentKeyHash })
+      void runInspection(stakeAddress, { paymentKeyHashes })
     }, 60_000)
     return () => window.clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, inspection?.stakeAddress, connectedWallet?.paymentKeyHash])
+  }, [autoRefresh, inspection?.stakeAddress, connectedWallet?.paymentKeyHashes])
 
   async function handleWalletConnected(wallet: ConnectedWallet) {
     setConnectedWallet(wallet)
     setAddress(wallet.stakeAddress)
     setValidationMessage(null)
     await runInspection(wallet.stakeAddress, {
-      paymentKeyHash: wallet.paymentKeyHash,
+      paymentKeyHashes: wallet.paymentKeyHashes,
     })
   }
 
@@ -222,13 +222,13 @@ export function InspectorApp() {
 
   async function handleSubmit() {
     await runInspection(address, {
-      paymentKeyHash: connectedWallet?.paymentKeyHash ?? null,
+      paymentKeyHashes: connectedWallet?.paymentKeyHashes ?? null,
     })
   }
 
   async function runInspection(
     stakeAddress: string,
-    options?: { paymentKeyHash?: string | null },
+    options?: { paymentKeyHashes?: string[] | null },
   ) {
     const validation = validateStakeAddress(stakeAddress)
 
@@ -291,8 +291,8 @@ export function InspectorApp() {
 
       // Cross-check on-chain state when indexer says registered
       if (result.status?.registered) {
-        const paymentKeyHash =
-          options?.paymentKeyHash ?? connectedWallet?.paymentKeyHash ?? null
+        const paymentKeyHashes =
+          options?.paymentKeyHashes ?? connectedWallet?.paymentKeyHashes ?? []
 
         if (result.status.utxoTxHash) {
           // Fast path: indexer has a UTxO pointer; check if still unspent.
@@ -301,20 +301,13 @@ export function InspectorApp() {
             result.status.utxoOutputIndex,
             null,
           )
-        } else if (paymentKeyHash) {
-          // Slow path: no UTxO pointer; scan the script address for this user's datum.
-          void fetchOnChainState(null, null, paymentKeyHash)
         } else {
-          // No wallet connected; the on-chain state cannot be determined.
-          setInspection((prev) =>
-            prev
-              ? applyOnChainState(prev, {
-                  kind: "unknown",
-                  error:
-                    "Connect a wallet to check the on-chain registration state.",
-                })
-              : prev,
-          )
+          // Slow path: no UTxO pointer; scan the script address for every
+          // registration of this stake account (works without a wallet too).
+          void fetchOnChainState(null, null, {
+            stakeAddress: validation.address,
+            paymentKeyHashes,
+          })
         }
       }
     } finally {
@@ -325,7 +318,7 @@ export function InspectorApp() {
   async function fetchOnChainState(
     utxoTxHash: string | null,
     utxoOutputIndex: string | null,
-    paymentKeyHash: string | null,
+    account: { stakeAddress: string; paymentKeyHashes: string[] } | null,
   ) {
     let requestBody: Record<string, unknown>
 
@@ -333,8 +326,11 @@ export function InspectorApp() {
       const outputIndex = utxoOutputIndex != null ? Number(utxoOutputIndex) : 0
       if (!Number.isFinite(outputIndex)) return
       requestBody = { utxoTxHash, utxoOutputIndex: outputIndex }
-    } else if (paymentKeyHash) {
-      requestBody = { paymentKeyHash }
+    } else if (account) {
+      requestBody = {
+        stakeAddress: account.stakeAddress,
+        paymentKeyHashes: account.paymentKeyHashes,
+      }
     } else {
       return
     }
@@ -384,7 +380,7 @@ export function InspectorApp() {
     setTimeout(() => {
       if (inspection) {
         void runInspection(inspection.stakeAddress, {
-          paymentKeyHash: connectedWallet?.paymentKeyHash ?? null,
+          paymentKeyHashes: connectedWallet?.paymentKeyHashes ?? null,
         })
       }
     }, 5_000)
@@ -632,7 +628,7 @@ export function InspectorApp() {
                 onInspectActiveSource={handleInspectActiveSource}
                 onRefresh={() =>
                   runInspection(inspection.stakeAddress, {
-                    paymentKeyHash: connectedWallet?.paymentKeyHash ?? null,
+                    paymentKeyHashes: connectedWallet?.paymentKeyHashes ?? null,
                   })
                 }
               />

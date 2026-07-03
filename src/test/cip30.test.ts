@@ -44,9 +44,42 @@ describe("CIP-30 wallet service", () => {
       "11111111111111111111111111111111111111111111111111111111",
     )
   })
+
+  test("collects the payment key hashes of every wallet address, change first", async () => {
+    window.cardano = {
+      eternl: {
+        name: "Eternl",
+        icon: "",
+        apiVersion: "1.0.0",
+        isEnabled: async () => false,
+        enable: async () =>
+          ({
+            getRewardAddresses: async () => [],
+            getChangeAddress: async () => makeBaseAddressHex(0x33),
+            getUsedAddresses: async () => [
+              makeBaseAddressHex(0x11),
+              makeBaseAddressHex(0x22),
+              // duplicate of the change address must not repeat
+              makeBaseAddressHex(0x33),
+            ],
+            getUnusedAddresses: async () => [makeBaseAddressHex(0x44)],
+          }) as never,
+      },
+    }
+
+    const wallet = await connectWallet("eternl")
+
+    expect(wallet.paymentKeyHashes).toEqual([
+      "33".repeat(28),
+      "11".repeat(28),
+      "22".repeat(28),
+      "44".repeat(28),
+    ])
+    expect(wallet.paymentKeyHash).toBe("33".repeat(28))
+  })
 })
 
-function makeBaseAddressHex(): string {
+function makeBaseAddressHex(paymentKeyByte = 0x11): string {
   const decodedStakeAddress = decodeBech32(stakeAddress)
 
   if (!decodedStakeAddress) {
@@ -55,7 +88,7 @@ function makeBaseAddressHex(): string {
 
   return bytesToHex([
     0x01,
-    ...Array.from({ length: 28 }, () => 0x11),
+    ...Array.from({ length: 28 }, () => paymentKeyByte),
     ...decodedStakeAddress.bytes.slice(1),
   ])
 }

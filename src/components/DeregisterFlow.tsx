@@ -23,6 +23,12 @@ type Registration = {
   dustAddressHex: string | null
   /** True when this registration's DUST address matches the connected Midnight wallet. */
   matchesWallet: boolean
+  /**
+   * False when the registration's c_wallet key is not among the payment keys
+   * the connected wallet reported — signing may still succeed (the key can be
+   * an unlisted address of the same account), but the user should know.
+   */
+  ownedByWallet: boolean | null
 }
 
 type SelectionState = { registrations: Registration[]; selected: Set<string> }
@@ -66,23 +72,21 @@ export function DeregisterFlow({
     let cancelled = false
 
     async function loadRegistrations() {
-      if (!wallet.paymentKeyHash) {
-        setFlow({
-          step: "error",
-          message:
-            "The wallet payment key hash could not be read. Reconnect the wallet and try again.",
-        })
-        return
-      }
-
       try {
+        // Identify the account by stake address AND every wallet payment key.
+        // The history view finds registrations by stake account, so deletion
+        // must search with the same identity — a registration's datum key is
+        // often an older (rotated) payment key, never just the current one.
         const response = await fetch("/api/active-registrations", {
           method: "POST",
           headers: {
             accept: "application/json",
             "content-type": "application/json",
           },
-          body: JSON.stringify({ paymentKeyHash: wallet.paymentKeyHash }),
+          body: JSON.stringify({
+            stakeAddress: wallet.stakeAddress,
+            paymentKeyHashes: wallet.paymentKeyHashes,
+          }),
         })
         const data = (await response.json()) as ActiveRegistrationsResult
 
@@ -98,6 +102,7 @@ export function DeregisterFlow({
                 connectedDustHex != null &&
                 r.dustAddressHex != null &&
                 r.dustAddressHex.toLowerCase() === connectedDustHex,
+              ownedByWallet: r.ownedByWallet,
             }))
           : []
 
@@ -116,6 +121,7 @@ export function DeregisterFlow({
               dustAddress: indexerStatus?.dustAddress ?? null,
               dustAddressHex: null,
               matchesWallet: false,
+              ownedByWallet: null,
             },
           ]
         }
@@ -160,14 +166,6 @@ export function DeregisterFlow({
   }, [])
 
   async function runRemoval(state: SelectionState) {
-    if (!wallet.paymentKeyHash) {
-      setFlow({
-        step: "error",
-        message: "The wallet payment key hash could not be read.",
-      })
-      return
-    }
-
     const queue = state.registrations.filter((r) =>
       state.selected.has(refKey(r)),
     )
@@ -181,7 +179,6 @@ export function DeregisterFlow({
       )
       const result = await deregisterDust(
         wallet.rawApi,
-        wallet.paymentKeyHash,
         queue.map((r) => ({ txHash: r.txHash, outputIndex: r.outputIndex })),
       )
 
@@ -380,6 +377,14 @@ function SelectStep({
                     {registration.txHash.slice(0, 12)}…
                     {registration.txHash.slice(-8)}#{registration.outputIndex}
                   </p>
+                  {registration.ownedByWallet === false && (
+                    <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                      Registered with an older payment key of this account. The
+                      wallet is asked to sign with that key — if signing fails,
+                      connect the wallet or account that created this
+                      registration.
+                    </p>
+                  )}
                 </div>
               </label>
             </li>

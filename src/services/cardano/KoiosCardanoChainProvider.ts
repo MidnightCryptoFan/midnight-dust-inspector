@@ -12,6 +12,7 @@ import type {
 } from "./CardanoChainProvider"
 import { DUST_CONTRACT } from "./dustContract"
 import { parseRegistrationDatum } from "@/lib/registrationDatum"
+import { bytesToHex, decodeBech32 } from "@/lib/bech32"
 
 type Fetcher = (
   input: RequestInfo | URL,
@@ -144,6 +145,23 @@ const koiosTxInfoWithInputsSchema = z
 
 const koiosTxInfoWithInputsResponseSchema = z.array(koiosTxInfoWithInputsSchema)
 
+/** Koios caps every response at this many rows; larger result sets are paged. */
+const KOIOS_PAGE_SIZE = 1000
+
+/** An unspent UTxO at the DUST registration script with its parsed datum. */
+export type ScriptRegistrationUtxo = {
+  txHash: string
+  outputIndex: number
+  /** The c_wallet payment key hash recorded in the registration datum. */
+  cWalletKeyHash: string
+  dustAddressHex: string | null
+}
+
+export type ActiveAccountRegistration = ScriptRegistrationUtxo & {
+  /** True when c_wallet matches one of the payment key hashes the caller supplied. */
+  ownedByWallet: boolean
+}
+
 export class KoiosCardanoChainProvider implements CardanoChainProvider {
   private readonly baseUrl: string
   private readonly fetcher: Fetcher
@@ -156,17 +174,35 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
     this.fetcher = options?.fetcher ?? fetch
   }
 
-  async getTransactionsForStakeAddress(
-    stakeAddress: string,
-  ): Promise<CardanoTransaction[]> {
-    const url = new URL(`${this.baseUrl}/account_txs`)
-    url.searchParams.set("_stake_address", stakeAddress)
+  /**
+   * POSTs one page of a Koios endpoint. `withCount` asks PostgREST for a
+   * Content-Range header so the total row count is known after the first page.
+   */
+  private async postPage(
+    path: string,
+    body: Record<string, unknown>,
+    options: { offset: number; select?: string; withCount?: boolean },
+  ): Promise<{ rows: unknown[]; total: number | null }> {
+    const url = new URL(`${this.baseUrl}${path}`)
+    if (options.select) {
+      url.searchParams.set("select", options.select)
+    }
+    if (options.offset > 0) {
+      url.searchParams.set("offset", String(options.offset))
+    }
+
+    const headers: Record<string, string> = {
+      accept: "application/json",
+      "content-type": "application/json",
+    }
+    if (options.withCount) {
+      headers.prefer = "count=estimated"
+    }
 
     const response = await this.fetcher(url, {
-      method: "GET",
-      headers: {
-        accept: "application/json",
-      },
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
       cache: "no-store",
     })
 
@@ -176,7 +212,111 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
       throw new Error(`Koios returned HTTP ${response.status}.`)
     }
 
-    const parsed = koiosAccountTransactionsSchema.parse(raw)
+    const rows = z.array(z.unknown()).parse(raw)
+
+    let total: number | null = null
+    const contentRange = response.headers?.get?.("content-range")
+    const totalMatch = contentRange?.match(/\/(\d+)\s*$/)
+    if (totalMatch) {
+      total = Number(totalMatch[1])
+    }
+
+    return { rows, total }
+  }
+
+  /**
+   * POSTs to a Koios endpoint and follows offset pagination until the full
+   * result set is read. Koios silently truncates at 1000 rows per response,
+   * so any potentially large result set MUST go through this helper — a
+   * single request looks complete but is not.
+   *
+   * When the first page reports a total row count, the remaining pages are
+   * fetched in parallel (each Koios page can take tens of seconds, so
+   * sequential paging would multiply that). A sequential tail guard covers a
+   * missing or underestimated count.
+   */
+  private async postAllPages(
+    path: string,
+    body: Record<string, unknown>,
+    select?: string,
+  ): Promise<unknown[]> {
+    const first = await this.postPage(path, body, {
+      offset: 0,
+      select,
+      withCount: true,
+    })
+    const rows = [...first.rows]
+
+    if (first.rows.length < KOIOS_PAGE_SIZE) {
+      return rows
+    }
+
+    let nextOffset = KOIOS_PAGE_SIZE
+    let lastPageFull = true
+
+    if (first.total != null && first.total > KOIOS_PAGE_SIZE) {
+      const offsets: number[] = []
+      for (let o = KOIOS_PAGE_SIZE; o < first.total; o += KOIOS_PAGE_SIZE) {
+        offsets.push(o)
+      }
+      const pages = await Promise.all(
+        offsets.map((offset) => this.postPage(path, body, { offset, select })),
+      )
+      for (const page of pages) {
+        rows.push(...page.rows)
+      }
+      nextOffset = offsets[offsets.length - 1]! + KOIOS_PAGE_SIZE
+      lastPageFull = pages[pages.length - 1]!.rows.length >= KOIOS_PAGE_SIZE
+    }
+
+    while (lastPageFull) {
+      const page = await this.postPage(path, body, {
+        offset: nextOffset,
+        select,
+      })
+      rows.push(...page.rows)
+      lastPageFull = page.rows.length >= KOIOS_PAGE_SIZE
+      nextOffset += KOIOS_PAGE_SIZE
+    }
+
+    return rows
+  }
+
+  async getTransactionsForStakeAddress(
+    stakeAddress: string,
+  ): Promise<CardanoTransaction[]> {
+    const rows: unknown[] = []
+
+    for (let offset = 0; ; offset += KOIOS_PAGE_SIZE) {
+      const url = new URL(`${this.baseUrl}/account_txs`)
+      url.searchParams.set("_stake_address", stakeAddress)
+      if (offset > 0) {
+        url.searchParams.set("offset", String(offset))
+      }
+
+      const response = await this.fetcher(url, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+        },
+        cache: "no-store",
+      })
+
+      const raw = await readJsonResponse(response)
+
+      if (!response.ok) {
+        throw new Error(`Koios returned HTTP ${response.status}.`)
+      }
+
+      const page = z.array(z.unknown()).parse(raw)
+      rows.push(...page)
+
+      if (page.length < KOIOS_PAGE_SIZE) {
+        break
+      }
+    }
+
+    const parsed = koiosAccountTransactionsSchema.parse(rows)
 
     return parsed.map((transaction) => ({
       txHash: transaction.tx_hash,
@@ -309,49 +449,25 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
   async getAssetsForStakeAddress(
     stakeAddress: string,
   ): Promise<CardanoAsset[]> {
-    const response = await this.fetcher(`${this.baseUrl}/account_assets`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ _stake_addresses: [stakeAddress] }),
-      cache: "no-store",
+    const rows = await this.postAllPages("/account_assets", {
+      _stake_addresses: [stakeAddress],
     })
 
-    const raw = await readJsonResponse(response)
-
-    if (!response.ok) {
-      throw new Error(`Koios returned HTTP ${response.status}.`)
-    }
-
-    const parsed = koiosAccountAssetsSchema.parse(raw)
+    const parsed = koiosAccountAssetsSchema.parse(rows)
 
     return parsed.map(toCardanoAsset)
   }
 
   async getAddressesForStakeAddress(stakeAddress: string): Promise<string[]> {
-    const response = await this.fetcher(`${this.baseUrl}/account_addresses`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        _stake_addresses: [stakeAddress],
-        _first_only: false,
-        _empty: false,
-      }),
-      cache: "no-store",
+    // _empty: true — an address whose funds have moved on still identifies
+    // the account (e.g. the address that once funded a registration).
+    const rows = await this.postAllPages("/account_addresses", {
+      _stake_addresses: [stakeAddress],
+      _first_only: false,
+      _empty: true,
     })
 
-    const raw = await readJsonResponse(response)
-
-    if (!response.ok) {
-      throw new Error(`Koios returned HTTP ${response.status}.`)
-    }
-
-    const parsed = koiosAccountAddressesSchema.parse(raw)
+    const parsed = koiosAccountAddressesSchema.parse(rows)
 
     return parsed.flatMap((account) => account.addresses)
   }
@@ -397,6 +513,42 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
   }
 
   /**
+   * Fetches every unspent UTxO at the DUST registration script address (all
+   * pages) and parses each inline datum. UTxOs without a parseable
+   * registration datum are skipped.
+   */
+  async getScriptRegistrationUtxos(): Promise<ScriptRegistrationUtxo[]> {
+    const rows = await this.postAllPages(
+      "/address_utxos",
+      {
+        _addresses: [DUST_CONTRACT.scriptAddress],
+        _extended: true,
+      },
+      // Only these columns are needed; the full rows roughly double the
+      // payload of an already large (multi-MB, multi-page) result set.
+      "tx_hash,tx_index,inline_datum",
+    )
+
+    const parsed = koiosScriptUtxosSchema.parse(rows)
+    const registrations: ScriptRegistrationUtxo[] = []
+
+    for (const utxo of parsed) {
+      const datumBytes = utxo.inline_datum?.bytes
+      if (!datumBytes) continue
+      const datum = parseRegistrationDatum(datumBytes)
+      if (!datum) continue
+      registrations.push({
+        txHash: utxo.tx_hash,
+        outputIndex: normalizeNumber(utxo.tx_index) ?? 0,
+        cWalletKeyHash: datum.paymentKeyHash,
+        dustAddressHex: datum.dustAddressHex,
+      })
+    }
+
+    return registrations
+  }
+
+  /**
    * Scans the DUST registration script address for ALL unspent UTxOs whose
    * datum encodes the given payment key hash in the c_wallet field, returning
    * each registration's UTxO reference and its registered DUST address.
@@ -410,48 +562,66 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
   ): Promise<
     Array<{ txHash: string; outputIndex: number; dustAddressHex: string | null }>
   > {
-    const response = await this.fetcher(`${this.baseUrl}/address_utxos`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        _addresses: [DUST_CONTRACT.scriptAddress],
-        _extended: true,
-      }),
-      cache: "no-store",
-    })
-
-    const raw = await readJsonResponse(response)
-
-    if (!response.ok) {
-      throw new Error(`Koios returned HTTP ${response.status}.`)
-    }
-
-    const parsed = koiosScriptUtxosSchema.parse(raw)
     const lowerKey = paymentKeyHash.toLowerCase()
+    const all = await this.getScriptRegistrationUtxos()
+    return all
+      .filter((utxo) => utxo.cWalletKeyHash === lowerKey)
+      .map((utxo) => ({
+        txHash: utxo.txHash,
+        outputIndex: utxo.outputIndex,
+        dustAddressHex: utxo.dustAddressHex,
+      }))
+  }
 
-    const matches: Array<{
-      txHash: string
-      outputIndex: number
-      dustAddressHex: string | null
-    }> = []
+  /**
+   * Finds every active registration that belongs to a stake account, using
+   * BOTH criteria the account can be recognised by:
+   *
+   * 1. The datum's c_wallet matches one of the given payment key hashes, or
+   *    the payment credential of any on-chain address of the stake account.
+   * 2. The UTxO was created by a transaction the stake account took part in
+   *    (i.e. the account funded the registration). This catches registrations
+   *    whose c_wallet is a wallet key that never appeared on-chain — e.g. a
+   *    fresh change address at registration time — which criterion 1 can
+   *    never see.
+   *
+   * The history view identifies the user by stake account, so deletion must
+   * use the same identity or the two views contradict each other.
+   */
+  async findActiveRegistrationsForAccount(input: {
+    stakeAddress?: string | null
+    paymentKeyHashes?: string[]
+  }): Promise<ActiveAccountRegistration[]> {
+    const walletKeys = new Set(
+      (input.paymentKeyHashes ?? []).map((key) => key.toLowerCase()),
+    )
+    const accountKeys = new Set(walletKeys)
+    let accountTxHashes = new Set<string>()
 
-    for (const utxo of parsed) {
-      const datumBytes = utxo.inline_datum?.bytes
-      if (!datumBytes) continue
-      const datum = parseRegistrationDatum(datumBytes)
-      if (datum?.paymentKeyHash === lowerKey) {
-        matches.push({
-          txHash: utxo.tx_hash,
-          outputIndex: normalizeNumber(utxo.tx_index) ?? 0,
-          dustAddressHex: datum.dustAddressHex,
-        })
+    if (input.stakeAddress) {
+      const [addresses, transactions] = await Promise.all([
+        this.getAddressesForStakeAddress(input.stakeAddress),
+        this.getTransactionsForStakeAddress(input.stakeAddress),
+      ])
+      for (const address of addresses) {
+        const keyHash = paymentKeyHashFromBech32Address(address)
+        if (keyHash) accountKeys.add(keyHash)
       }
+      accountTxHashes = new Set(transactions.map((tx) => tx.txHash))
     }
 
-    return matches
+    const scriptUtxos = await this.getScriptRegistrationUtxos()
+
+    return scriptUtxos
+      .filter(
+        (utxo) =>
+          accountKeys.has(utxo.cWalletKeyHash) ||
+          accountTxHashes.has(utxo.txHash),
+      )
+      .map((utxo) => ({
+        ...utxo,
+        ownedByWallet: walletKeys.has(utxo.cWalletKeyHash),
+      }))
   }
 
   /**
@@ -469,62 +639,26 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
     paymentKeyHash: string | null
     stakeAddress: string | null
   } | null> {
-    const response = await this.fetcher(`${this.baseUrl}/address_utxos`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        _addresses: [DUST_CONTRACT.scriptAddress],
-        _extended: true,
-      }),
-      cache: "no-store",
-    })
-
-    const raw = await readJsonResponse(response)
-    if (!response.ok) {
-      throw new Error(`Koios returned HTTP ${response.status}.`)
-    }
-
-    const parsed = koiosScriptUtxosSchema.parse(raw)
+    const scriptUtxos = await this.getScriptRegistrationUtxos()
     const lowerDustHex = dustAddressHex.toLowerCase()
 
-    let matchedTxHash: string | null = null
-    let matchedOutputIndex: number | null = null
-    let matchedPaymentKeyHash: string | null = null
+    const match = scriptUtxos.find(
+      (utxo) => utxo.dustAddressHex === lowerDustHex,
+    )
 
-    for (const utxo of parsed) {
-      const datumBytes = utxo.inline_datum?.bytes
-      if (!datumBytes) continue
-
-      const lowerDatum = datumBytes.toLowerCase()
-      if (!lowerDatum.includes(lowerDustHex)) continue
-
-      // Extract the payment key hash from c_wallet part of datum:
-      // Pattern: d8799f d8799f 581c <28-byte-key-hash> ff
-      const keyMatch = lowerDatum.match(/d8799fd8799f581c([0-9a-f]{56})ff/)
-      matchedTxHash = utxo.tx_hash
-      matchedOutputIndex = normalizeNumber(utxo.tx_index) ?? 0
-      matchedPaymentKeyHash = keyMatch?.[1] ?? null
-      break
-    }
-
-    if (!matchedTxHash) {
+    if (!match) {
       return null
     }
 
-    const stakeAddress = matchedPaymentKeyHash
-      ? await this.resolveStakeAddressFromTx(
-          matchedTxHash,
-          matchedPaymentKeyHash,
-        )
-      : null
+    const stakeAddress = await this.resolveStakeAddressFromTx(
+      match.txHash,
+      match.cWalletKeyHash,
+    )
 
     return {
-      txHash: matchedTxHash,
-      outputIndex: matchedOutputIndex ?? 0,
-      paymentKeyHash: matchedPaymentKeyHash,
+      txHash: match.txHash,
+      outputIndex: match.outputIndex,
+      paymentKeyHash: match.cWalletKeyHash,
       stakeAddress,
     }
   }
@@ -582,26 +716,20 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
       return []
     }
 
-    const response = await this.fetcher(`${this.baseUrl}/address_utxos`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        _addresses: addresses.slice(0, 100),
-        _extended: true,
-      }),
-      cache: "no-store",
-    })
-
-    const raw = await readJsonResponse(response)
-
-    if (!response.ok) {
-      throw new Error(`Koios returned HTTP ${response.status}.`)
+    // Koios accepts a limited number of addresses per request, so query in
+    // chunks instead of silently dropping addresses beyond the first 100.
+    const rows: unknown[] = []
+    for (let i = 0; i < addresses.length; i += 100) {
+      const chunk = addresses.slice(i, i + 100)
+      rows.push(
+        ...(await this.postAllPages("/address_utxos", {
+          _addresses: chunk,
+          _extended: true,
+        })),
+      )
     }
 
-    const parsed = koiosAddressUtxosSchema.parse(raw)
+    const parsed = koiosAddressUtxosSchema.parse(rows)
 
     return parsed.map((utxo) => ({
       txHash: utxo.tx_hash,
@@ -614,6 +742,23 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
       raw: utxo,
     }))
   }
+}
+
+/**
+ * Extracts the payment key hash from a bech32 Cardano address. Returns null
+ * for script payment credentials (odd Shelley address types) — those hashes
+ * are not verification keys and can never sign a deregistration.
+ */
+function paymentKeyHashFromBech32Address(address: string): string | null {
+  const decoded = decodeBech32(address)
+  if (!decoded || decoded.bytes.length < 29) return null
+
+  const headerByte = decoded.bytes[0]!
+  const addressType = (headerByte & 0xf0) >> 4
+  if (addressType > 7) return null
+  if ((addressType & 1) === 1) return null
+
+  return bytesToHex(decoded.bytes.slice(1, 29)).toLowerCase()
 }
 
 async function readJsonResponse(response: Response): Promise<unknown> {

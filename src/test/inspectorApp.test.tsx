@@ -120,7 +120,7 @@ afterEach(() => {
 })
 
 describe("InspectorApp wallet connection", () => {
-  test("uses the connected wallet payment key hash for the first on-chain scan", async () => {
+  test("scans on-chain state with the stake address and every wallet payment key", async () => {
     vi.mocked(connectWallet).mockResolvedValue({
       info: {
         id: "eternl",
@@ -129,6 +129,7 @@ describe("InspectorApp wallet connection", () => {
       },
       stakeAddress,
       paymentKeyHash,
+      paymentKeyHashes: [paymentKeyHash],
       rawApi: {} as never,
     })
     vi.mocked(inspectDustGenerationStatusFromApi).mockResolvedValue({
@@ -158,7 +159,10 @@ describe("InspectorApp wallet connection", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/on-chain-registration",
         expect.objectContaining({
-          body: JSON.stringify({ paymentKeyHash }),
+          body: JSON.stringify({
+            stakeAddress,
+            paymentKeyHashes: [paymentKeyHash],
+          }),
         }),
       )
     })
@@ -173,6 +177,7 @@ describe("InspectorApp wallet connection", () => {
       },
       stakeAddress,
       paymentKeyHash,
+      paymentKeyHashes: [paymentKeyHash],
       rawApi: {} as never,
     })
     vi.mocked(inspectDustGenerationStatusFromApi).mockResolvedValue({

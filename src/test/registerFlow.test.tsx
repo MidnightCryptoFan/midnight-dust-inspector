@@ -11,6 +11,7 @@ const connectedWallet: ConnectedWallet = {
   },
   stakeAddress: "stake1u8eseh2482k5e3a65sy9xsakzjl497zt5elwfh7q3u8k54g7yetxq",
   paymentKeyHash: "f9e4b726d2aa13b3b3c4ea3dc964382bc0aea1d65600d4dac0e0538a",
+  paymentKeyHashes: ["f9e4b726d2aa13b3b3c4ea3dc964382bc0aea1d65600d4dac0e0538a"],
   rawApi: {} as never,
 }
 
