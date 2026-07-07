@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { decodeBech32, bytesToHex } from "@/lib/bech32"
 import type { ConnectedWallet } from "@/services/wallet/cip30"
+import { useKoiosThrottle } from "./KoiosThrottleNote"
 
 type Props = {
   wallet: ConnectedWallet
@@ -332,6 +333,7 @@ function ConfirmStep({
 }
 
 function SigningStep() {
+  const { waiting, secondsLeft } = useKoiosThrottle()
   return (
     <div className="space-y-4 py-4 text-center">
       <div className="flex justify-center">
@@ -339,10 +341,12 @@ function SigningStep() {
       </div>
       <div>
         <p className="font-semibold text-slate-950">
-          Waiting for wallet signature...
+          {waiting ? "Preparing transaction…" : "Waiting for wallet signature..."}
         </p>
         <p className="mt-1 text-sm text-slate-600">
-          Confirm the transaction in your wallet extension.
+          {waiting
+            ? `Spacing out Koios requests to stay within rate limits · resuming in ${Math.max(secondsLeft, 1)}s`
+            : "Confirm the transaction in your wallet extension."}
         </p>
       </div>
     </div>

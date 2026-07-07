@@ -8,6 +8,7 @@
 import type { OutRef, WalletApi } from "@lucid-evolution/lucid"
 import { DUST_CONTRACT, DUST_NFT_UNIT } from "./dustContract"
 import { parseRegistrationDatum } from "@/lib/registrationDatum"
+import { installKoiosFetchThrottle } from "./koiosRateLimiter"
 
 // Types
 
@@ -18,6 +19,10 @@ export type TxResult =
 // Lucid factory (lazy-loaded, browser only)
 
 async function buildLucid(walletApi: WalletApi) {
+  // Ensure Lucid's own Koios calls (epoch_params, utxosByOutRef, …) pass through
+  // the shared client-side rate limiter, so they can't burst past Koios's
+  // 100/10s per-IP limit and get their connection dropped ("Transport error").
+  installKoiosFetchThrottle()
   const { Lucid, Koios } = await import("@lucid-evolution/lucid")
   const koiosUrl =
     process.env.NEXT_PUBLIC_CARDANO_KOIOS_URL ?? "https://api.koios.rest/api/v1"
@@ -72,7 +77,9 @@ export async function deregisterDust(
     const { Data, Constr } = await import("@lucid-evolution/lucid")
     const lucid = await buildLucid(walletApi)
 
-    const utxos = await lucid.utxosByOutRef(registrationOutRefs)
+    const utxos = await withTransportRetry(() =>
+      lucid.utxosByOutRef(registrationOutRefs),
+    )
 
     if (utxos.length !== registrationOutRefs.length) {
       return {
@@ -122,7 +129,7 @@ export async function deregisterDust(
       txBuilder = txBuilder.addSignerKey(key)
     }
 
-    const tx = await txBuilder.complete()
+    const tx = await withTransportRetry(() => txBuilder.complete())
 
     const signedTx = await tx.sign.withWallet().complete()
     const txHash = await signedTx.submit()
@@ -176,19 +183,21 @@ export async function registerDust(
     // Mint redeemer: Constr 0 [] = d87980
     const mintRedeemer = Data.to(new Constr(0, []))
 
-    const tx = await lucid
-      .newTx()
-      .mintAssets({ [DUST_NFT_UNIT]: 1n }, mintRedeemer)
-      .pay.ToContract(
-        DUST_CONTRACT.scriptAddress,
-        { kind: "inline", value: datum },
-        { lovelace: 2_000_000n, [DUST_NFT_UNIT]: 1n },
-      )
-      .attach.MintingPolicy(REGISTRATION_SCRIPT)
-      // The minting policy also runs check_auth on the c_wallet recorded in the
-      // datum, so the registering key must be an explicit required signer.
-      .addSignerKey(paymentKeyHash)
-      .complete()
+    const tx = await withTransportRetry(() =>
+      lucid
+        .newTx()
+        .mintAssets({ [DUST_NFT_UNIT]: 1n }, mintRedeemer)
+        .pay.ToContract(
+          DUST_CONTRACT.scriptAddress,
+          { kind: "inline", value: datum },
+          { lovelace: 2_000_000n, [DUST_NFT_UNIT]: 1n },
+        )
+        .attach.MintingPolicy(REGISTRATION_SCRIPT)
+        // The minting policy also runs check_auth on the c_wallet recorded in the
+        // datum, so the registering key must be an explicit required signer.
+        .addSignerKey(paymentKeyHash)
+        .complete(),
+    )
 
     const signedTx = await tx.sign.withWallet().complete()
     const txHash = await signedTx.submit()
@@ -200,6 +209,47 @@ export async function registerDust(
 }
 
 // Helpers
+
+/**
+ * Retries a Koios-backed Lucid operation on transient transport failures.
+ *
+ * Even with the client-side rate limiter, a single Koios request can still be
+ * dropped (network blip, connection reset). Because these operations are
+ * read-and-build only — no transaction is signed or submitted here — retrying
+ * is safe. Signing and submission happen after this and are never retried.
+ */
+async function withTransportRetry<T>(
+  operation: () => Promise<T>,
+  attempts = 3,
+): Promise<T> {
+  let lastError: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await operation()
+    } catch (err) {
+      lastError = err
+      if (i === attempts - 1 || !isTransientTransportError(err)) throw err
+      // Backoff; the rate limiter spaces the actual request once it fires.
+      await new Promise((r) => setTimeout(r, 1_500 * (i + 1)))
+    }
+  }
+  throw lastError
+}
+
+function isTransientTransportError(err: unknown): boolean {
+  const message = (
+    err instanceof Error ? err.message : String(err)
+  ).toLowerCase()
+  return (
+    message.includes("transport error") ||
+    message.includes("failed to fetch") ||
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    message.includes("econnreset") ||
+    message.includes("timeout") ||
+    message.includes("load failed")
+  )
+}
 
 function formatError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)

@@ -5,6 +5,7 @@ import type { ConnectedWallet } from "@/services/wallet/cip30"
 import type { DustGenerationStatus } from "@/domain/dustStatus"
 import type { ActiveRegistrationsResult } from "@/app/api/active-registrations/route"
 import { decodeBech32, bytesToHex } from "@/lib/bech32"
+import { useKoiosThrottle } from "./KoiosThrottleNote"
 
 type Props = {
   wallet: ConnectedWallet
@@ -432,6 +433,7 @@ function SelectStep({
 }
 
 function SigningStep({ count }: { count: number }) {
+  const { waiting, secondsLeft } = useKoiosThrottle()
   return (
     <div className="space-y-4 py-4 text-center">
       <div className="flex justify-center">
@@ -439,13 +441,15 @@ function SigningStep({ count }: { count: number }) {
       </div>
       <div>
         <p className="font-semibold text-slate-950">
-          Waiting for wallet signature…
+          {waiting ? "Preparing transaction…" : "Waiting for wallet signature…"}
         </p>
         <p className="mt-1 text-sm text-slate-600">
-          Confirm the transaction in your wallet extension.
-          {count > 1
-            ? ` All ${count} registrations are removed in this one transaction.`
-            : ""}
+          {waiting
+            ? `Spacing out Koios requests to stay within rate limits · resuming in ${Math.max(secondsLeft, 1)}s`
+            : "Confirm the transaction in your wallet extension." +
+              (count > 1
+                ? ` All ${count} registrations are removed in this one transaction.`
+                : "")}
         </p>
       </div>
     </div>

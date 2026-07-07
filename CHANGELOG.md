@@ -7,9 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] – 0.5.9
 
+### Fixed
+
+- Transaction building no longer fails with an opaque "Transport error" when the
+  browser has just made a burst of Koios calls. All browser-side Koios requests
+  (the registration-timeline scan and Lucid's own transaction-build calls) now
+  pass through a shared client-side rate limiter that keeps them under Koios's
+  100 requests / 10 s per-IP limit, so connections are no longer dropped.
+  Requests still originate from each user's own IP (no shared server proxy).
+- Transaction building now retries automatically on transient transport failures
+  before surfacing an error.
+
 ### Added
 
-- _(nothing yet)_
+- Progress feedback while inspecting: the scan now shows "Analyzing transactions
+  (x/y)", and both the scan and the transaction-build steps show a short
+  "resuming in Ns" countdown whenever requests are briefly paused to respect the
+  Koios rate limit.
 
 ---
 

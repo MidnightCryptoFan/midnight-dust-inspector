@@ -16,6 +16,8 @@ export async function inspectRegistrationTimeline(
     provider?: CardanoChainProvider
     checkedAt?: string
     limit?: number
+    /** Reports scan progress as transaction details are fetched. */
+    onProgress?: (done: number, total: number) => void
   },
 ): Promise<RegistrationTimelineInspectionResult> {
   const checkedAt = options?.checkedAt ?? new Date().toISOString()
@@ -30,6 +32,11 @@ export async function inspectRegistrationTimeline(
     ])
     const utxos = await provider.getUtxosForAddresses(addresses)
     const recentTransactions = transactions.slice(0, limit)
+
+    let done = 0
+    const total = recentTransactions.length
+    options?.onProgress?.(0, total)
+
     const details = await Promise.all(
       recentTransactions.map(async (transaction) => {
         try {
@@ -44,6 +51,9 @@ export async function inspectRegistrationTimeline(
             metadata: null,
             raw: null,
           } satisfies CardanoTransactionDetails
+        } finally {
+          done += 1
+          options?.onProgress?.(done, total)
         }
       }),
     )

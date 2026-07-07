@@ -34,6 +34,7 @@ import {
   mockIndexerScenarios,
 } from "@/services/midnightIndexerClient"
 import { inspectRegistrationTimelineCached } from "@/services/registrationTimelineCache"
+import { KoiosThrottleNote } from "./KoiosThrottleNote"
 import { type ConnectedWallet } from "@/services/wallet/cip30"
 import { readMidnightWalletDustBalance } from "@/services/wallet/midnightDappConnector"
 import { WalletConnectSection } from "./WalletConnectSection"
@@ -79,6 +80,10 @@ export function InspectorApp() {
   )
   const [validationNote, setValidationNote] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [scanProgress, setScanProgress] = useState<{
+    done: number
+    total: number
+  } | null>(null)
   const [mockScenario, setMockScenario] =
     useState<MockIndexerScenario>("healthy")
   const [inspection, setInspection] = useState<InspectionState | null>(null)
@@ -242,6 +247,7 @@ export function InspectorApp() {
     setValidationMessage(null)
     setValidationNote(validation.note ?? null)
     setIsLoading(true)
+    setScanProgress(null)
     router.replace(`?stake=${encodeURIComponent(validation.address)}`, {
       scroll: false,
     })
@@ -257,7 +263,9 @@ export function InspectorApp() {
               cardanoAccountSnapshot: null,
               controlledError: null,
             })
-          : inspectRegistrationTimelineCached(validation.address),
+          : inspectRegistrationTimelineCached(validation.address, {
+              onProgress: (done, total) => setScanProgress({ done, total }),
+            }),
       ])
 
       const registrationAddress = await resolveRegistrationAddress(
@@ -312,6 +320,7 @@ export function InspectorApp() {
       }
     } finally {
       setIsLoading(false)
+      setScanProgress(null)
     }
   }
 
@@ -598,7 +607,12 @@ export function InspectorApp() {
             {isLoading && (
               <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                Inspecting…
+                <span>
+                  {scanProgress && scanProgress.total > 0
+                    ? `Analyzing transactions (${scanProgress.done}/${scanProgress.total})`
+                    : "Inspecting…"}
+                  <KoiosThrottleNote className="ml-1.5 text-slate-400 dark:text-slate-500" />
+                </span>
               </div>
             )}
           </div>
