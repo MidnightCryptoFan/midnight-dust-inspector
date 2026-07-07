@@ -103,6 +103,24 @@ describe("findAllRegistrationUtxosForPaymentKey", () => {
       [{ txHash: "txDeep", outputIndex: 1, dustAddressHex: DUST_2 }],
     )
   })
+
+  test("surfaces the HTTP status on a rate-limit (429) instead of an opaque parse error", async () => {
+    // Koios answers a rate-limited request with a non-JSON body. Parsing it
+    // first would throw "Unexpected token" and hide the real cause; the status
+    // must come through so the 100/10s limit is diagnosable.
+    const provider = new KoiosCardanoChainProvider({
+      fetcher: async () =>
+        ({
+          ok: false,
+          status: 429,
+          text: async () => "Too Many Requests",
+        }) as unknown as Response,
+    })
+
+    await expect(
+      provider.findAllRegistrationUtxosForPaymentKey(KEY_A),
+    ).rejects.toThrow(/HTTP 429/)
+  })
 })
 
 describe("findActiveRegistrationsForAccount", () => {

@@ -764,11 +764,29 @@ function paymentKeyHashFromBech32Address(address: string): string | null {
 async function readJsonResponse(response: Response): Promise<unknown> {
   const body = await response.text()
 
+  // Surface the HTTP status BEFORE attempting to parse. Koios returns non-JSON
+  // bodies on errors — notably a plain/HTML body on a 429 rate-limit response —
+  // so parsing first would throw an opaque "Unexpected token" SyntaxError and
+  // hide the real cause (e.g. the 100 requests / 10 s per-IP limit was hit).
+  if (!response.ok) {
+    const snippet = body.trim().slice(0, 200)
+    throw new Error(
+      `Koios returned HTTP ${response.status}${snippet ? `: ${snippet}` : ""}`,
+    )
+  }
+
   if (body.trim().length === 0) {
     return null
   }
 
-  return JSON.parse(body) as unknown
+  try {
+    return JSON.parse(body) as unknown
+  } catch {
+    const snippet = body.trim().slice(0, 200)
+    throw new Error(
+      `Koios returned a non-JSON response (HTTP ${response.status}): ${snippet}`,
+    )
+  }
 }
 
 function normalizeBlockTime(
