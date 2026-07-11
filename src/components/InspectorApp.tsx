@@ -34,7 +34,7 @@ import {
   mockIndexerScenarios,
 } from "@/services/midnightIndexerClient"
 import { inspectRegistrationTimelineCached } from "@/services/registrationTimelineCache"
-import { KoiosThrottleNote } from "./KoiosThrottleNote"
+import { KoiosThrottleNote, KoiosTransportNote } from "./KoiosThrottleNote"
 import { type ConnectedWallet } from "@/services/wallet/cip30"
 import { readMidnightWalletDustBalance } from "@/services/wallet/midnightDappConnector"
 import { WalletConnectSection } from "./WalletConnectSection"
@@ -612,6 +612,7 @@ export function InspectorApp() {
                     ? `Analyzing transactions (${scanProgress.done}/${scanProgress.total})`
                     : "Inspecting…"}
                   <KoiosThrottleNote className="ml-1.5 text-slate-400 dark:text-slate-500" />
+                  <KoiosTransportNote className="ml-1.5 text-slate-400 dark:text-slate-500" />
                 </span>
               </div>
             )}

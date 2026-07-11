@@ -5,7 +5,7 @@ import type { ConnectedWallet } from "@/services/wallet/cip30"
 import type { DustGenerationStatus } from "@/domain/dustStatus"
 import type { ActiveRegistrationsResult } from "@/app/api/active-registrations/route"
 import { decodeBech32, bytesToHex } from "@/lib/bech32"
-import { useKoiosThrottle } from "./KoiosThrottleNote"
+import { KoiosTransportNote, useKoiosThrottle } from "./KoiosThrottleNote"
 
 type Props = {
   wallet: ConnectedWallet
@@ -451,6 +451,7 @@ function SigningStep({ count }: { count: number }) {
                 ? ` All ${count} registrations are removed in this one transaction.`
                 : "")}
         </p>
+        <KoiosTransportNote className="mt-1 block text-xs text-slate-400" />
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ import type { RegistrationTimelineInspectionResult } from "@/domain/registration
 import { inspectRegistrationTimeline } from "./registrationTimelineClient"
 import { inspectRegistrationTimelineFromApi } from "./registrationTimelineApiClient"
 import { KoiosCardanoChainProvider } from "./cardano/KoiosCardanoChainProvider"
-import { installKoiosFetchThrottle } from "./cardano/koiosRateLimiter"
+import { installKoiosBrowserTransport } from "./cardano/koiosTransport.client"
 
 const CACHE_TTL_MS = 60_000
 const INCREMENTAL_CHECK_COUNT = 5
@@ -31,8 +31,10 @@ export async function inspectRegistrationTimelineCached(
   options?: { onProgress?: (done: number, total: number) => void },
 ): Promise<RegistrationTimelineInspectionResult> {
   // Route all browser-side Koios calls (this scan + Lucid's later tx build)
-  // through the shared rate limiter so the burst can't trip Koios's 100/10s cap.
-  installKoiosFetchThrottle()
+  // through the shared transport: rate-limited so the burst can't trip
+  // Koios's 100/10s cap, with a server-proxy fallback when the browser
+  // cannot reach Koios directly.
+  installKoiosBrowserTransport()
 
   const now = Date.now()
   const entry = cache.get(stakeAddress)

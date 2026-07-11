@@ -8,7 +8,7 @@
 import type { OutRef, WalletApi } from "@lucid-evolution/lucid"
 import { DUST_CONTRACT, DUST_NFT_UNIT } from "./dustContract"
 import { parseRegistrationDatum } from "@/lib/registrationDatum"
-import { installKoiosFetchThrottle } from "./koiosRateLimiter"
+import { installKoiosBrowserTransport } from "./koiosTransport.client"
 
 // Types
 
@@ -19,10 +19,11 @@ export type TxResult =
 // Lucid factory (lazy-loaded, browser only)
 
 async function buildLucid(walletApi: WalletApi) {
-  // Ensure Lucid's own Koios calls (epoch_params, utxosByOutRef, …) pass through
-  // the shared client-side rate limiter, so they can't burst past Koios's
-  // 100/10s per-IP limit and get their connection dropped ("Transport error").
-  installKoiosFetchThrottle()
+  // Ensure Lucid's own Koios calls (epoch_params, utxosByOutRef, …) pass
+  // through the shared client-side transport: rate-limited direct access with
+  // an automatic fallback to /api/koios-proxy when the user's browser cannot
+  // reach Koios at all (ad-blocker, firewall, VPN — "Transport error").
+  installKoiosBrowserTransport()
   const { Lucid, Koios } = await import("@lucid-evolution/lucid")
   const koiosUrl =
     process.env.NEXT_PUBLIC_CARDANO_KOIOS_URL ?? "https://api.koios.rest/api/v1"
@@ -75,7 +76,9 @@ export async function deregisterDust(
 
   try {
     const { Data, Constr } = await import("@lucid-evolution/lucid")
-    const lucid = await buildLucid(walletApi)
+    // Lucid fetches the protocol parameters (epoch_params) eagerly on
+    // creation, so this call needs the same transport retry as the rest.
+    const lucid = await withTransportRetry(() => buildLucid(walletApi))
 
     const utxos = await withTransportRetry(() =>
       lucid.utxosByOutRef(registrationOutRefs),
@@ -173,7 +176,9 @@ export async function registerDust(
 
   try {
     const { Data, Constr } = await import("@lucid-evolution/lucid")
-    const lucid = await buildLucid(walletApi)
+    // Lucid fetches the protocol parameters (epoch_params) eagerly on
+    // creation, so this call needs the same transport retry as the rest.
+    const lucid = await withTransportRetry(() => buildLucid(walletApi))
 
     // DustMappingDatum { c_wallet: VerificationKey(paymentKeyHash), dust_address }
     const datum = Data.to(

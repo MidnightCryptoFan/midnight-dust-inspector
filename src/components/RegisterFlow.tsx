@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { decodeBech32, bytesToHex } from "@/lib/bech32"
 import type { ConnectedWallet } from "@/services/wallet/cip30"
-import { useKoiosThrottle } from "./KoiosThrottleNote"
+import { KoiosTransportNote, useKoiosThrottle } from "./KoiosThrottleNote"
 
 type Props = {
   wallet: ConnectedWallet
@@ -348,6 +348,7 @@ function SigningStep() {
             ? `Spacing out Koios requests to stay within rate limits · resuming in ${Math.max(secondsLeft, 1)}s`
             : "Confirm the transaction in your wallet extension."}
         </p>
+        <KoiosTransportNote className="mt-1 block text-xs text-slate-400" />
       </div>
     </div>
   )

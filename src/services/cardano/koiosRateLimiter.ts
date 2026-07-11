@@ -11,9 +11,9 @@
  *
  * This module funnels every browser-side Koios request through a sliding-window
  * throttle (a safety margin under the hard limit) so calls are spaced instead of
- * bursting. It also installs a global `fetch` wrapper scoped to the Koios host,
- * so both our own provider AND Lucid's internal calls (which take no custom
- * fetch) are covered by the same throttle.
+ * bursting. The global `fetch` wrapper that routes Koios requests through this
+ * throttle (and adds the server-proxy fallback) lives in
+ * koiosTransport.client.ts.
  *
  * A small observable store exposes the wait state so the UI can show a
  * "resuming in Ns" countdown while requests are queued.
@@ -23,7 +23,6 @@ const WINDOW_MS = 10_000
 // Hard limit is 100/10s; stay under it to leave room for timing jitter and any
 // un-throttled calls (e.g. wallet submit endpoints).
 const MAX_IN_WINDOW = 90
-const KOIOS_HOST_HINT = "koios.rest"
 
 // Timestamps (ms) of granted slots within the current window.
 let grants: number[] = []
@@ -119,37 +118,4 @@ export function getKoiosThrottleSnapshot(): KoiosThrottleState {
 
 export function getServerKoiosThrottleSnapshot(): KoiosThrottleState {
   return snapshot
-}
-
-// --- Global fetch wrapper (scoped to the Koios host) ----------------------
-
-let installed = false
-
-/**
- * Idempotently wraps the browser's global `fetch` so that any request to the
- * Koios host passes through the throttle first. Non-Koios requests are passed
- * straight through untouched. No-op on the server.
- */
-export function installKoiosFetchThrottle(): void {
-  if (installed || typeof window === "undefined") return
-  installed = true
-
-  const originalFetch = window.fetch.bind(window)
-
-  window.fetch = async function throttledFetch(
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> {
-    let url: string
-    if (typeof input === "string") url = input
-    else if (input instanceof URL) url = input.href
-    else url = input.url
-
-    if (!url.includes(KOIOS_HOST_HINT)) {
-      return originalFetch(input, init)
-    }
-
-    await acquireKoiosSlot()
-    return originalFetch(input, init)
-  }
 }
