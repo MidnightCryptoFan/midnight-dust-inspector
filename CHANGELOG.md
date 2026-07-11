@@ -5,11 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] – 0.5.10
+## [0.5.10] – 2026-07-11
+
+### Fixed
+
+- Registration and de-registration no longer fail with "Transport error" when
+  the user's browser cannot reach the Koios API directly (ad-blocker,
+  corporate firewall, VPN or ISP block, flaky DNS). Every browser-side Koios
+  request — including Lucid's internal transaction-build calls such as
+  `epoch_params` — now automatically retries through a new server-side relay
+  (`/api/koios-proxy`) when the direct connection fails. After three direct
+  transport failures the session switches to the relay entirely instead of
+  paying a timeout on every request. Direct-from-browser remains the default
+  path so Koios rate limits stay on each user's own IP.
+- The Lucid initialization step (which eagerly fetches protocol parameters)
+  is now covered by the same transient-transport retry as the rest of the
+  transaction build; previously a single dropped connection at that step
+  failed the whole action without any retry.
 
 ### Added
 
-- _(nothing yet)_
+- A small "relaying via server" note appears during inspection and while a
+  transaction is being prepared whenever Koios requests are being served
+  through the server relay, so degraded-connectivity sessions are visible.
 
 ---
 
