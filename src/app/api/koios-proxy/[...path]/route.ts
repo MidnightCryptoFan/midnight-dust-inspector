@@ -44,6 +44,17 @@ const ALLOWED_ENDPOINTS = new Set([
 const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "prefer"]
 const FORWARDED_RESPONSE_HEADERS = ["content-type", "content-range"]
 
+/**
+ * Endpoints whose data only changes once per epoch (~5 days), served from
+ * Vercel's CDN cache so repeat calls never reach Koios. epoch_params is the
+ * single most frequent call — Lucid fetches it on every transaction build.
+ * One stale hour right at an epoch boundary is harmless: parameter values
+ * rarely change between epochs at all.
+ */
+const EPOCH_STABLE_ENDPOINTS = new Set(["epoch_params", "totals"])
+const EPOCH_STABLE_CACHE_CONTROL =
+  "public, s-maxage=3600, stale-while-revalidate=86400"
+
 type RouteContext = { params: Promise<{ path: string[] }> }
 
 export async function GET(
@@ -106,6 +117,12 @@ async function proxy(
   for (const name of FORWARDED_RESPONSE_HEADERS) {
     const value = upstream.headers.get(name)
     if (value) responseHeaders.set(name, value)
+  }
+
+  // Only successful GET responses for epoch-stable data are CDN-cacheable;
+  // everything else (live chain state, errors) must stay fresh.
+  if (method === "GET" && upstream.ok && EPOCH_STABLE_ENDPOINTS.has(endpoint)) {
+    responseHeaders.set("cache-control", EPOCH_STABLE_CACHE_CONTROL)
   }
 
   return new Response(await upstream.arrayBuffer(), {

@@ -75,6 +75,64 @@ describe("koios proxy route", () => {
     expect(response.headers.get("content-range")).toBe("0-999/2431")
   })
 
+  it("marks successful epoch_params responses as CDN-cacheable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("[]", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    )
+
+    const response = await GET(
+      new Request("http://localhost/api/koios-proxy/epoch_params?limit=1"),
+      context(["epoch_params"]),
+    )
+
+    expect(response.headers.get("cache-control")).toContain("s-maxage=3600")
+  })
+
+  it("does not mark live chain-state responses as cacheable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("[]", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    )
+
+    const response = await POST(
+      new Request("http://localhost/api/koios-proxy/tx_info", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+      context(["tx_info"]),
+    )
+
+    expect(response.headers.get("cache-control")).toBeNull()
+  })
+
+  it("does not mark failed epoch_params responses as cacheable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("rate limited", { status: 429 })),
+    )
+
+    const response = await GET(
+      new Request("http://localhost/api/koios-proxy/epoch_params?limit=1"),
+      context(["epoch_params"]),
+    )
+
+    expect(response.headers.get("cache-control")).toBeNull()
+  })
+
   it("rejects endpoints that are not on the allowlist without calling Koios", async () => {
     const upstream = vi.fn()
     vi.stubGlobal("fetch", upstream)

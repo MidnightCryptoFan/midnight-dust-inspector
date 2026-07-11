@@ -7,9 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] – 0.5.11
 
-### Added
+### Changed
 
-- _(nothing yet)_
+- The Koios server relay now serves epoch-stable data (`epoch_params`,
+  `totals`) from the CDN cache (1 h, stale-while-revalidate), so the most
+  frequent transaction-build call no longer consumes Koios quota on repeat
+  requests.
+- Koios rate-limit responses (HTTP 429) are now treated as transient during
+  transaction building: the build retries with a longer backoff that clears
+  Koios's 10 s quota window instead of failing immediately.
 
 ---
 

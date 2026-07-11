@@ -235,13 +235,16 @@ async function withTransportRetry<T>(
       lastError = err
       if (i === attempts - 1 || !isTransientTransportError(err)) throw err
       // Backoff; the rate limiter spaces the actual request once it fires.
-      await new Promise((r) => setTimeout(r, 1_500 * (i + 1)))
+      // Rate-limit responses need a longer pause — Koios counts requests in
+      // a 10 s window, so retrying after 1.5 s would just hit the same wall.
+      const base = isRateLimitError(err) ? 6_000 : 1_500
+      await new Promise((r) => setTimeout(r, base * (i + 1)))
     }
   }
   throw lastError
 }
 
-function isTransientTransportError(err: unknown): boolean {
+export function isTransientTransportError(err: unknown): boolean {
   const message = (
     err instanceof Error ? err.message : String(err)
   ).toLowerCase()
@@ -252,7 +255,24 @@ function isTransientTransportError(err: unknown): boolean {
     message.includes("network") ||
     message.includes("econnreset") ||
     message.includes("timeout") ||
-    message.includes("load failed")
+    message.includes("load failed") ||
+    isRateLimitError(err)
+  )
+}
+
+/**
+ * A rate-limited request (HTTP 429) is transient by definition — the quota
+ * window clears within seconds. Matches both our own provider's errors
+ * ("Koios returned HTTP 429…") and generic rate-limit phrasings.
+ */
+function isRateLimitError(err: unknown): boolean {
+  const message = (
+    err instanceof Error ? err.message : String(err)
+  ).toLowerCase()
+  return (
+    /\b429\b/.test(message) ||
+    message.includes("too many requests") ||
+    message.includes("rate limit")
   )
 }
 
