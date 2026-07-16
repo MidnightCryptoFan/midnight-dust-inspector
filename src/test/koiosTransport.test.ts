@@ -330,6 +330,130 @@ describe("tx_info collateral asset_list repair", () => {
     expect(tx.plutus_contracts).toBeNull()
   })
 
+  // Verbatim shape of the third Koios breakage: the registration output's
+  // inline_datum arrives with bytes null while the decoded value and the
+  // datum_hash are still present. /datum_info still serves the real bytes.
+  const DATUM_HASH =
+    "443a90e5e217934abc5080ba2a18b1d6879472a41960d20f920b97ba114e014b"
+  const DATUM_BYTES = "d8799fd8799f581caabbccff5821010203ff"
+  const DATUM_VALUE = {
+    constructor: 0,
+    fields: [
+      { constructor: 0, fields: [{ bytes: "aabbcc" }] },
+      { bytes: "01" },
+    ],
+  }
+
+  function brokenDatumTxInfoBody() {
+    return JSON.stringify([
+      {
+        tx_hash: "8481ce81",
+        outputs: [
+          { tx_index: 1, datum_hash: null, inline_datum: null, asset_list: [] },
+          {
+            tx_index: 0,
+            datum_hash: DATUM_HASH,
+            inline_datum: { bytes: null, value: DATUM_VALUE },
+            asset_list: [],
+          },
+        ],
+      },
+    ])
+  }
+
+  it("refetches missing output datum bytes from datum_info", async () => {
+    const inner = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : String(input)
+        if (url.endsWith("/datum_info")) {
+          expect(JSON.parse(String(init?.body))).toEqual({
+            _datum_hashes: [DATUM_HASH],
+          })
+          return okResponse(
+            JSON.stringify([
+              {
+                datum_hash: DATUM_HASH,
+                bytes: DATUM_BYTES,
+                value: DATUM_VALUE,
+              },
+            ]),
+          )
+        }
+        return okResponse(brokenDatumTxInfoBody())
+      },
+    )
+    const transportFetch = createKoiosTransportFetch(inner)
+
+    const response = await transportFetch(TX_INFO_URL)
+    const [tx] = (await response.json()) as Array<Record<string, unknown>>
+
+    const outputs = tx.outputs as Array<Record<string, unknown>>
+    const scriptOutput = outputs.find((out) => out.tx_index === 0)!
+    expect(scriptOutput.inline_datum).toEqual({
+      bytes: DATUM_BYTES,
+      value: DATUM_VALUE,
+    })
+    // The refetch went to the Koios datum_info endpoint through the transport.
+    expect(inner).toHaveBeenCalledTimes(2)
+    expect(String(inner.mock.calls[1]![0])).toBe(
+      "https://api.koios.rest/api/v1/datum_info",
+    )
+  })
+
+  it("leaves an output datum broken when datum_info cannot provide the bytes", async () => {
+    const inner = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : String(input)
+      if (url.endsWith("/datum_info")) {
+        return okResponse("[]")
+      }
+      return okResponse(brokenDatumTxInfoBody())
+    })
+    const transportFetch = createKoiosTransportFetch(inner)
+
+    const response = await transportFetch(TX_INFO_URL)
+    const [tx] = (await response.json()) as Array<Record<string, unknown>>
+
+    const outputs = tx.outputs as Array<Record<string, unknown>>
+    const scriptOutput = outputs.find((out) => out.tx_index === 0)!
+    const inlineDatum = scriptOutput.inline_datum as Record<string, unknown>
+    // Better a loud schema error downstream than fabricated datum data.
+    expect(inlineDatum.bytes).toBeNull()
+  })
+
+  it("nulls a malformed dead-section inline_datum without a refetch", async () => {
+    const body = JSON.stringify([
+      {
+        tx_hash: "abc",
+        outputs: [{ tx_index: 0, asset_list: [] }],
+        collateral_output: {
+          tx_index: 2,
+          asset_list: [],
+          inline_datum: { bytes: null, value: { constructor: 0, fields: [] } },
+        },
+        inputs: [
+          {
+            tx_index: 0,
+            asset_list: [],
+            inline_datum: { bytes: null, value: null },
+          },
+        ],
+      },
+    ])
+    const inner = vi.fn(async () => okResponse(body))
+    const transportFetch = createKoiosTransportFetch(inner)
+
+    const response = await transportFetch(TX_INFO_URL)
+    const [tx] = (await response.json()) as Array<Record<string, unknown>>
+
+    expect(
+      (tx.collateral_output as Record<string, unknown>).inline_datum,
+    ).toBeNull()
+    const [input] = tx.inputs as Array<Record<string, unknown>>
+    expect(input.inline_datum).toBeNull()
+    // Dead sections never trigger the datum_info lookup.
+    expect(inner).toHaveBeenCalledTimes(1)
+  })
+
   it("keeps a well-formed plutus_contracts section untouched", async () => {
     const wellFormed = {
       ...MALFORMED_PLUTUS_CONTRACT,

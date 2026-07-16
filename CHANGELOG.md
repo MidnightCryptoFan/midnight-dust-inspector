@@ -7,9 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] – 0.5.13
 
-### Added
+### Fixed
 
-- _(nothing yet)_
+- Clean up no longer fails with a `ParseError` on registrations whose Koios
+  `tx_info` data carries `inline_datum.bytes: null` (the third shape of the
+  ongoing Koios response regression). The Koios transport now refetches the
+  real datum bytes from `/datum_info` via the output's datum hash before
+  Lucid parses the response; malformed datums in never-consumed sections are
+  nulled locally.
+- Cleaning up multiple registrations created by different transactions no
+  longer aborts with "One or more registration UTxOs were not found
+  on-chain": Lucid Evolution's Koios provider only returns UTxOs of the
+  first transaction in a batched `getUtxosByOutRef` call, so the app now
+  queries once per creating transaction and merges the results.
 
 ---
 

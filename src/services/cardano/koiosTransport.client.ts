@@ -128,7 +128,7 @@ async function sendDirectWithProxyFallback(
  * installer so it can be unit-tested without touching window.fetch.
  */
 export function createKoiosTransportFetch(originalFetch: FetchLike): FetchLike {
-  return async function koiosTransportFetch(input, init) {
+  const koiosTransportFetch: FetchLike = async (input, init) => {
     const url = requestUrl(input)
     if (!isKoiosUrl(url)) {
       return originalFetch(input, init)
@@ -143,15 +143,20 @@ export function createKoiosTransportFetch(originalFetch: FetchLike): FetchLike {
       ? await sendDirectWithProxyFallback(originalFetch, proxyUrl, input, init)
       : await originalFetch(input, init)
 
-    return isTxInfoUrl(url) ? normalizeTxInfoResponse(response) : response
+    // The datum repair may need a follow-up /datum_info call; routing it
+    // through this same transport keeps the throttle and proxy fallback.
+    return isTxInfoUrl(url)
+      ? normalizeTxInfoResponse(response, url, koiosTransportFetch)
+      : response
   }
+  return koiosTransportFetch
 }
 
 // --- /tx_info response repair ------------------------------------------------
 
 /**
- * Koios mainnet currently (since ~July 2026) returns two malformed sections
- * in /tx_info that Lucid Evolution's strict Effect schema rejects:
+ * Koios mainnet currently (since ~July 2026) returns three malformed
+ * sections in /tx_info that Lucid Evolution's strict Effect schema rejects:
  *
  * 1. `collateral_output.asset_list` is a raw STRING instead of an array:
  *    `"[]"` when empty, otherwise a Haskell Show dump of db-sync's
@@ -162,21 +167,31 @@ export function createKoiosTransportFetch(originalFetch: FetchLike): FetchLike {
  *    (Koios only fills bytecode when `_bytecode: true` is requested, which
  *    Lucid never sends) and `input.datum: null`, where the schema demands
  *    strings / an object.
+ * 3. `inline_datum` objects carry `bytes: null` (the decoded `value` is
+ *    still present), where the schema demands a string — observed on the
+ *    registration outputs themselves. /datum_info and /utxo_info still
+ *    return the correct CBOR bytes for the same datums, so only the
+ *    /tx_info query path is broken.
  *
  * Effect reports only the FIRST schema error, so these surface one at a
  * time. Every transaction that spends or mints through a Plutus script —
- * i.e. every DUST registration — trips both, and the whole transaction
+ * i.e. every DUST registration — trips them, and the whole transaction
  * build aborts with a ParseError. This hook repairs the response before
  * Lucid sees it.
  *
  * Lucid only ever consumes `outputs` from /tx_info (getUtxosByOutRef,
- * awaitTx), so the collateral-/reference-side asset lists and the
- * plutus_contracts section are dead data here: replacing a malformed string
- * asset_list with an empty array and nulling a malformed plutus_contracts
- * section (its schema allows null) is lossless. `inputs`/`outputs` are
- * deliberately NOT touched: blanking a real output's asset list would
- * corrupt transaction building (e.g. hide the registration NFT from the
- * pre-flight checks), so a malformed entry there must keep failing loudly.
+ * awaitTx), so everything else is dead data here and is repaired locally:
+ * malformed string asset_lists become empty arrays, a malformed
+ * plutus_contracts section and malformed dead-section inline_datum objects
+ * become null (their schemas allow null) — all lossless.
+ *
+ * The `outputs` section is live data and is treated differently: a broken
+ * output inline_datum is REFETCHED from /datum_info via the output's
+ * datum_hash (the deregistration flow spends these UTxOs and needs the real
+ * datum bytes). An output asset_list is never touched and an unrepairable
+ * output datum is left broken: blanking either would corrupt transaction
+ * building (hide the registration NFT or its datum), so those must keep
+ * failing loudly.
  */
 function isTxInfoUrl(url: string): boolean {
   return url.split(/[?#]/, 1)[0]!.endsWith("/tx_info")
@@ -209,7 +224,27 @@ function isMalformedPlutusContract(entry: unknown): boolean {
   return input.datum === null || typeof input.datum !== "object"
 }
 
-/** Repairs all tolerable sections of a /tx_info payload, in place. */
+/** True when an inline_datum object would fail Lucid's schema. */
+function isMalformedInlineDatum(inlineDatum: unknown): boolean {
+  if (inlineDatum === null || typeof inlineDatum !== "object") return false
+  const datum = inlineDatum as { bytes?: unknown; value?: unknown }
+  return (
+    typeof datum.bytes !== "string" ||
+    datum.value === null ||
+    typeof datum.value !== "object"
+  )
+}
+
+/** Nulls a malformed inline_datum on a dead-section entry, in place. */
+function repairDeadInlineDatum(entry: unknown): boolean {
+  if (entry === null || typeof entry !== "object") return false
+  const io = entry as { inline_datum?: unknown }
+  if (!isMalformedInlineDatum(io.inline_datum)) return false
+  io.inline_datum = null
+  return true
+}
+
+/** Repairs the dead (never consumed) sections of a /tx_info payload, in place. */
 function repairTxInfoPayload(payload: unknown): boolean {
   if (!Array.isArray(payload)) return false
   let changed = false
@@ -217,11 +252,17 @@ function repairTxInfoPayload(payload: unknown): boolean {
     if (tx === null || typeof tx !== "object") continue
     const record = tx as Record<string, unknown>
     changed = repairStringAssetList(record.collateral_output) || changed
-    for (const key of ["collateral_inputs", "reference_inputs"]) {
+    changed = repairDeadInlineDatum(record.collateral_output) || changed
+    for (const key of ["collateral_inputs", "reference_inputs", "inputs"]) {
       const list = record[key]
       if (!Array.isArray(list)) continue
       for (const entry of list) {
-        changed = repairStringAssetList(entry) || changed
+        // inputs' asset_list is deliberately excluded: the timeline consumers
+        // read it, so a malformed one there must keep failing loudly.
+        if (key !== "inputs") {
+          changed = repairStringAssetList(entry) || changed
+        }
+        changed = repairDeadInlineDatum(entry) || changed
       }
     }
     const contracts = record.plutus_contracts
@@ -233,7 +274,113 @@ function repairTxInfoPayload(payload: unknown): boolean {
   return changed
 }
 
-async function normalizeTxInfoResponse(response: Response): Promise<Response> {
+type BrokenOutputDatum = {
+  inlineDatum: { bytes?: unknown; value?: unknown }
+  datumHash: string
+}
+
+/**
+ * Finds outputs whose inline_datum would fail Lucid's schema but whose
+ * datum_hash allows the real bytes to be refetched from /datum_info.
+ */
+function collectBrokenOutputDatums(payload: unknown): BrokenOutputDatum[] {
+  const broken: BrokenOutputDatum[] = []
+  if (!Array.isArray(payload)) return broken
+  for (const tx of payload) {
+    if (tx === null || typeof tx !== "object") continue
+    const outputs = (tx as Record<string, unknown>).outputs
+    if (!Array.isArray(outputs)) continue
+    for (const output of outputs) {
+      if (output === null || typeof output !== "object") continue
+      const record = output as { inline_datum?: unknown; datum_hash?: unknown }
+      if (!isMalformedInlineDatum(record.inline_datum)) continue
+      if (typeof record.datum_hash !== "string") continue
+      broken.push({
+        inlineDatum: record.inline_datum as {
+          bytes?: unknown
+          value?: unknown
+        },
+        datumHash: record.datum_hash,
+      })
+    }
+  }
+  return broken
+}
+
+/**
+ * Refetches the real datum bytes from /datum_info and patches the broken
+ * output datums in place. Anything that cannot be repaired stays broken on
+ * purpose — the schema error downstream is better than silently spending a
+ * script UTxO with fabricated datum data.
+ */
+async function repairOutputDatums(
+  broken: BrokenOutputDatum[],
+  txInfoUrl: string,
+  transportFetch: FetchLike,
+): Promise<boolean> {
+  const base = txInfoUrl.split(/[?#]/, 1)[0]!
+  const datumInfoUrl = base.slice(0, -"/tx_info".length) + "/datum_info"
+  const hashes = [...new Set(broken.map((entry) => entry.datumHash))]
+
+  try {
+    const response = await transportFetch(datumInfoUrl, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ _datum_hashes: hashes }),
+    })
+    if (!response.ok) return false
+    const rows: unknown = await response.json()
+    if (!Array.isArray(rows)) return false
+
+    const byHash = new Map<string, { bytes: string; value: unknown }>()
+    for (const row of rows) {
+      if (row === null || typeof row !== "object") continue
+      const datum = row as {
+        datum_hash?: unknown
+        bytes?: unknown
+        value?: unknown
+      }
+      if (
+        typeof datum.datum_hash === "string" &&
+        typeof datum.bytes === "string"
+      ) {
+        byHash.set(datum.datum_hash, {
+          bytes: datum.bytes,
+          value: datum.value,
+        })
+      }
+    }
+
+    let changed = false
+    for (const entry of broken) {
+      const lookup = byHash.get(entry.datumHash)
+      if (!lookup) continue
+      if (typeof entry.inlineDatum.bytes !== "string") {
+        entry.inlineDatum.bytes = lookup.bytes
+      }
+      if (
+        entry.inlineDatum.value === null ||
+        typeof entry.inlineDatum.value !== "object"
+      ) {
+        entry.inlineDatum.value = lookup.value
+      }
+      changed = true
+    }
+    return changed
+  } catch {
+    // The lookup itself failed — leave the payload as delivered.
+    return false
+  }
+}
+
+async function normalizeTxInfoResponse(
+  response: Response,
+  url: string,
+  transportFetch: FetchLike,
+): Promise<Response> {
   if (!response.ok) return response
 
   let payload: unknown
@@ -244,7 +391,14 @@ async function normalizeTxInfoResponse(response: Response): Promise<Response> {
     return response
   }
 
-  if (!repairTxInfoPayload(payload)) return response
+  let changed = repairTxInfoPayload(payload)
+  const brokenDatums = collectBrokenOutputDatums(payload)
+  if (brokenDatums.length > 0) {
+    changed =
+      (await repairOutputDatums(brokenDatums, url, transportFetch)) || changed
+  }
+
+  if (!changed) return response
 
   // Content-length no longer matches the repaired body; everything else
   // (content-type in particular) must survive for the consumers.

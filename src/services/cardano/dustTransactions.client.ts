@@ -5,7 +5,7 @@
  * This module is browser-only and must never be imported in server components.
  */
 
-import type { OutRef, WalletApi } from "@lucid-evolution/lucid"
+import type { OutRef, UTxO, WalletApi } from "@lucid-evolution/lucid"
 import { DUST_CONTRACT, DUST_NFT_UNIT } from "./dustContract"
 import { parseRegistrationDatum } from "@/lib/registrationDatum"
 import { installKoiosBrowserTransport } from "./koiosTransport.client"
@@ -81,7 +81,10 @@ export async function deregisterDust(
     const lucid = await withTransportRetry(() => buildLucid(walletApi))
 
     const utxos = await withTransportRetry(() =>
-      lucid.utxosByOutRef(registrationOutRefs),
+      utxosByOutRefPerTx(
+        (outRefs) => lucid.utxosByOutRef(outRefs),
+        registrationOutRefs,
+      ),
     )
 
     if (utxos.length !== registrationOutRefs.length) {
@@ -214,6 +217,38 @@ export async function registerDust(
 }
 
 // Helpers
+
+/**
+ * Fetches UTxOs by out-reference with ONE provider call per creating
+ * transaction.
+ *
+ * Lucid Evolution's Koios provider destructures only the FIRST transaction
+ * of the /tx_info response (`const [result] = …`), so a single call with
+ * outRefs from N different transactions silently drops every UTxO not
+ * created by the first one. Registrations are usually created by separate
+ * transactions, so a multi-registration clean-up would lose all but one and
+ * abort with "not found on-chain". Grouping per tx hash keeps each call
+ * inside the provider's supported shape; the shared rate limiter spaces the
+ * requests.
+ */
+export async function utxosByOutRefPerTx(
+  fetchUtxosByOutRef: (outRefs: OutRef[]) => Promise<UTxO[]>,
+  outRefs: OutRef[],
+): Promise<UTxO[]> {
+  const byTxHash = new Map<string, OutRef[]>()
+  for (const outRef of outRefs) {
+    const group = byTxHash.get(outRef.txHash)
+    if (group) {
+      group.push(outRef)
+    } else {
+      byTxHash.set(outRef.txHash, [outRef])
+    }
+  }
+  const results = await Promise.all(
+    [...byTxHash.values()].map((group) => fetchUtxosByOutRef(group)),
+  )
+  return results.flat()
+}
 
 /**
  * Retries a Koios-backed Lucid operation on transient transport failures.
