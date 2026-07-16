@@ -7,9 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] – 0.5.12
 
-### Added
+### Fixed
 
-- _(nothing yet)_
+- Transaction building ("Clean up" / "Register") no longer aborts with a
+  `ParseError` on Koios `/tx_info` responses. Koios mainnet currently returns
+  `collateral_output.asset_list` as a string and `plutus_contracts` entries
+  with null `address`/`bytecode`/`input.datum`, both of which Lucid
+  Evolution's strict response schema rejects — and every DUST registration is
+  a Plutus transaction with a collateral return, so every clean-up hit this.
+  The client-side Koios transport now repairs these sections (which Lucid
+  never consumes) before Lucid parses the response; regular outputs are left
+  untouched.
 
 ---
 

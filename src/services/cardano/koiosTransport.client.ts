@@ -92,10 +92,40 @@ async function relayThroughProxy(
   return originalFetch(proxyUrl, init)
 }
 
+async function sendDirectWithProxyFallback(
+  originalFetch: FetchLike,
+  proxyUrl: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  if (directTransportFailures >= DIRECT_FAILURE_LIMIT) {
+    return relayThroughProxy(originalFetch, proxyUrl, input, init)
+  }
+
+  // A Request's body stream can only be read once, so the direct attempt
+  // uses a clone and the original stays replayable for the proxy retry.
+  const directInput = input instanceof Request ? input.clone() : input
+  try {
+    return await originalFetch(directInput, init)
+  } catch (directError) {
+    // Only fetch rejections land here (network-level failure). HTTP error
+    // statuses resolve normally and are handled by the callers.
+    directTransportFailures += 1
+    notifyTransport()
+    try {
+      return await relayThroughProxy(originalFetch, proxyUrl, input, init)
+    } catch {
+      // The proxy failed too — surface the direct error, which names the
+      // actual Koios endpoint instead of the proxy route.
+      throw directError
+    }
+  }
+}
+
 /**
- * Wraps a fetch implementation with the Koios throttle and the direct→proxy
- * fallback. Exported separately from the installer so it can be unit-tested
- * without touching window.fetch.
+ * Wraps a fetch implementation with the Koios throttle, the direct→proxy
+ * fallback, and the /tx_info response repair. Exported separately from the
+ * installer so it can be unit-tested without touching window.fetch.
  */
 export function createKoiosTransportFetch(originalFetch: FetchLike): FetchLike {
   return async function koiosTransportFetch(input, init) {
@@ -109,33 +139,122 @@ export function createKoiosTransportFetch(originalFetch: FetchLike): FetchLike {
     await acquireKoiosSlot()
 
     const proxyUrl = proxyUrlFor(url)
-    if (!proxyUrl) {
-      return originalFetch(input, init)
-    }
+    const response = proxyUrl
+      ? await sendDirectWithProxyFallback(originalFetch, proxyUrl, input, init)
+      : await originalFetch(input, init)
 
-    if (directTransportFailures >= DIRECT_FAILURE_LIMIT) {
-      return relayThroughProxy(originalFetch, proxyUrl, input, init)
-    }
+    return isTxInfoUrl(url) ? normalizeTxInfoResponse(response) : response
+  }
+}
 
-    // A Request's body stream can only be read once, so the direct attempt
-    // uses a clone and the original stays replayable for the proxy retry.
-    const directInput = input instanceof Request ? input.clone() : input
-    try {
-      return await originalFetch(directInput, init)
-    } catch (directError) {
-      // Only fetch rejections land here (network-level failure). HTTP error
-      // statuses resolve normally and are handled by the callers.
-      directTransportFailures += 1
-      notifyTransport()
-      try {
-        return await relayThroughProxy(originalFetch, proxyUrl, input, init)
-      } catch {
-        // The proxy failed too — surface the direct error, which names the
-        // actual Koios endpoint instead of the proxy route.
-        throw directError
+// --- /tx_info response repair ------------------------------------------------
+
+/**
+ * Koios mainnet currently (since ~July 2026) returns two malformed sections
+ * in /tx_info that Lucid Evolution's strict Effect schema rejects:
+ *
+ * 1. `collateral_output.asset_list` is a raw STRING instead of an array:
+ *    `"[]"` when empty, otherwise a Haskell Show dump of db-sync's
+ *    multi_assets_descr column, e.g.
+ *    `[(PolicyID {policyID = ScriptHash "…"},[("4e49474854",130672882)])]` —
+ *    note: NOT JSON, so it cannot simply be JSON.parse()d.
+ * 2. `plutus_contracts[]` entries carry `address: null`, `bytecode: null`
+ *    (Koios only fills bytecode when `_bytecode: true` is requested, which
+ *    Lucid never sends) and `input.datum: null`, where the schema demands
+ *    strings / an object.
+ *
+ * Effect reports only the FIRST schema error, so these surface one at a
+ * time. Every transaction that spends or mints through a Plutus script —
+ * i.e. every DUST registration — trips both, and the whole transaction
+ * build aborts with a ParseError. This hook repairs the response before
+ * Lucid sees it.
+ *
+ * Lucid only ever consumes `outputs` from /tx_info (getUtxosByOutRef,
+ * awaitTx), so the collateral-/reference-side asset lists and the
+ * plutus_contracts section are dead data here: replacing a malformed string
+ * asset_list with an empty array and nulling a malformed plutus_contracts
+ * section (its schema allows null) is lossless. `inputs`/`outputs` are
+ * deliberately NOT touched: blanking a real output's asset list would
+ * corrupt transaction building (e.g. hide the registration NFT from the
+ * pre-flight checks), so a malformed entry there must keep failing loudly.
+ */
+function isTxInfoUrl(url: string): boolean {
+  return url.split(/[?#]/, 1)[0]!.endsWith("/tx_info")
+}
+
+/** Replaces a string-typed asset_list on one input/output entry. */
+function repairStringAssetList(entry: unknown): boolean {
+  if (entry === null || typeof entry !== "object") return false
+  const io = entry as { asset_list?: unknown }
+  if (typeof io.asset_list !== "string") return false
+  io.asset_list = []
+  return true
+}
+
+/**
+ * True when a plutus_contracts entry would fail Lucid's schema (string
+ * address/bytecode, object input.datum).
+ */
+function isMalformedPlutusContract(entry: unknown): boolean {
+  if (entry === null || typeof entry !== "object") return true
+  const contract = entry as {
+    address?: unknown
+    bytecode?: unknown
+    input?: unknown
+  }
+  if (typeof contract.address !== "string") return true
+  if (typeof contract.bytecode !== "string") return true
+  const input = contract.input as { datum?: unknown } | null | undefined
+  if (input === null || typeof input !== "object") return true
+  return input.datum === null || typeof input.datum !== "object"
+}
+
+/** Repairs all tolerable sections of a /tx_info payload, in place. */
+function repairTxInfoPayload(payload: unknown): boolean {
+  if (!Array.isArray(payload)) return false
+  let changed = false
+  for (const tx of payload) {
+    if (tx === null || typeof tx !== "object") continue
+    const record = tx as Record<string, unknown>
+    changed = repairStringAssetList(record.collateral_output) || changed
+    for (const key of ["collateral_inputs", "reference_inputs"]) {
+      const list = record[key]
+      if (!Array.isArray(list)) continue
+      for (const entry of list) {
+        changed = repairStringAssetList(entry) || changed
       }
     }
+    const contracts = record.plutus_contracts
+    if (Array.isArray(contracts) && contracts.some(isMalformedPlutusContract)) {
+      record.plutus_contracts = null
+      changed = true
+    }
   }
+  return changed
+}
+
+async function normalizeTxInfoResponse(response: Response): Promise<Response> {
+  if (!response.ok) return response
+
+  let payload: unknown
+  try {
+    payload = await response.clone().json()
+  } catch {
+    // Non-JSON body (e.g. an HTML error page) — leave it to the callers.
+    return response
+  }
+
+  if (!repairTxInfoPayload(payload)) return response
+
+  // Content-length no longer matches the repaired body; everything else
+  // (content-type in particular) must survive for the consumers.
+  const headers = new Headers(response.headers)
+  headers.delete("content-length")
+  return new Response(JSON.stringify(payload), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
 }
 
 // --- Global installer ------------------------------------------------------
