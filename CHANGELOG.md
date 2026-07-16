@@ -19,6 +19,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   never consumes) before Lucid parses the response; regular outputs are left
   untouched.
 
+### Changed
+
+- The app's own Koios response schemas now tolerate `asset_list: null`
+  (meaning "no native assets") in `tx_info` and `address_utxos` rows instead
+  of failing the whole call, guarding against the kind of unannounced
+  response-shape drift that broke transaction building above.
+
 ---
 
 ## [0.5.11] – 2026-07-11

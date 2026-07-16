@@ -45,6 +45,19 @@ const koiosTxAssetItemSchema = z
   })
   .passthrough()
 
+/**
+ * Accepts an asset_list that is an array, null, or absent — Koios means "no
+ * native assets" by all three. Koios has changed field shapes without notice
+ * before (July 2026: collateral_output.asset_list became a string), so the
+ * harmless null variant must not crash a whole call.
+ */
+function tolerantAssetList<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .array(item)
+    .nullish()
+    .transform((value) => value ?? [])
+}
+
 const koiosTxOutputSchema = z
   .object({
     tx_index: z.union([z.number(), z.string()]),
@@ -54,7 +67,7 @@ const koiosTxOutputSchema = z
       })
       .passthrough(),
     stake_addr: z.string().nullable().optional(),
-    asset_list: z.array(koiosTxAssetItemSchema).optional().default([]),
+    asset_list: tolerantAssetList(koiosTxAssetItemSchema),
   })
   .passthrough()
 
@@ -96,7 +109,7 @@ const koiosUtxoSchema = z
     stake_address: z.string().nullable().optional(),
     block_time: z.union([z.number(), z.string(), z.null()]).optional(),
     block_height: z.union([z.number(), z.string(), z.null()]).optional(),
-    asset_list: z.array(koiosAssetSchema).optional().default([]),
+    asset_list: tolerantAssetList(koiosAssetSchema),
   })
   .passthrough()
 
@@ -131,7 +144,7 @@ const koiosTxInputSchema = z
       .passthrough()
       .optional(),
     stake_addr: z.string().nullable().optional(),
-    asset_list: z.array(koiosTxAssetItemSchema).optional().default([]),
+    asset_list: tolerantAssetList(koiosTxAssetItemSchema),
   })
   .passthrough()
 
@@ -509,7 +522,9 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
   ): Promise<{ txHash: string; outputIndex: number } | null> {
     const all = await this.findAllRegistrationUtxosForPaymentKey(paymentKeyHash)
     const first = all[0]
-    return first ? { txHash: first.txHash, outputIndex: first.outputIndex } : null
+    return first
+      ? { txHash: first.txHash, outputIndex: first.outputIndex }
+      : null
   }
 
   /**
@@ -560,7 +575,11 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
   async findAllRegistrationUtxosForPaymentKey(
     paymentKeyHash: string,
   ): Promise<
-    Array<{ txHash: string; outputIndex: number; dustAddressHex: string | null }>
+    Array<{
+      txHash: string
+      outputIndex: number
+      dustAddressHex: string | null
+    }>
   > {
     const lowerKey = paymentKeyHash.toLowerCase()
     const all = await this.getScriptRegistrationUtxos()
