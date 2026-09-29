@@ -175,6 +175,33 @@ export type ActiveAccountRegistration = ScriptRegistrationUtxo & {
   ownedByWallet: boolean
 }
 
+const KOIOS_MAX_REQUEST_BYTES = 4500
+
+function chunkAddressesByPayloadSize(addresses: string[]): string[][] {
+  const chunks: string[][] = []
+  let chunk: string[] = []
+
+  for (const address of addresses) {
+    const candidate = [...chunk, address]
+    const payload = JSON.stringify({ _addresses: candidate, _extended: true })
+    if (payload.length > KOIOS_MAX_REQUEST_BYTES && chunk.length > 0) {
+      chunks.push(chunk)
+      chunk = [address]
+    } else {
+      chunk = candidate
+    }
+
+    if (
+      JSON.stringify({ _addresses: chunk, _extended: true }).length >
+      KOIOS_MAX_REQUEST_BYTES
+    ) {
+      throw new Error("A Cardano address exceeds Koios request size limits.")
+    }
+  }
+
+  if (chunk.length > 0) chunks.push(chunk)
+  return chunks
+}
 export class KoiosCardanoChainProvider implements CardanoChainProvider {
   private readonly baseUrl: string
   private readonly fetcher: Fetcher
@@ -572,9 +599,7 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
    * generation expects exactly one), so this is the source of truth for
    * cleaning up multiple registrations — independent of the lagging indexer.
    */
-  async findAllRegistrationUtxosForPaymentKey(
-    paymentKeyHash: string,
-  ): Promise<
+  async findAllRegistrationUtxosForPaymentKey(paymentKeyHash: string): Promise<
     Array<{
       txHash: string
       outputIndex: number
@@ -735,11 +760,10 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
       return []
     }
 
-    // Koios accepts a limited number of addresses per request, so query in
-    // chunks instead of silently dropping addresses beyond the first 100.
+    // Koios enforces a 5 KiB request-body cap; address-count chunks can exceed
+    // it because each bech32 address is roughly 100 bytes long.
     const rows: unknown[] = []
-    for (let i = 0; i < addresses.length; i += 100) {
-      const chunk = addresses.slice(i, i + 100)
+    for (const chunk of chunkAddressesByPayloadSize(addresses)) {
       rows.push(
         ...(await this.postAllPages("/address_utxos", {
           _addresses: chunk,
