@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { decodeBech32, bytesToHex } from "@/lib/bech32"
+import { decodeBech32, decodeBech32m, bytesToHex } from "@/lib/bech32"
 import type { ConnectedWallet } from "@/services/wallet/cip30"
 import { KoiosTransportNote, useKoiosThrottle } from "./KoiosThrottleNote"
 
@@ -341,7 +341,9 @@ function SigningStep() {
       </div>
       <div>
         <p className="font-semibold text-slate-950">
-          {waiting ? "Preparing transaction…" : "Waiting for wallet signature..."}
+          {waiting
+            ? "Preparing transaction…"
+            : "Waiting for wallet signature..."}
         </p>
         <p className="mt-1 text-sm text-slate-600">
           {waiting
@@ -382,6 +384,23 @@ function SuccessStep({
           Transaction hash
         </p>
         <p className="break-all font-mono text-xs text-slate-600">{txHash}</p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <button
+            className="font-semibold text-teal-700 underline"
+            type="button"
+            onClick={() => void navigator.clipboard.writeText(txHash)}
+          >
+            Copy transaction ID
+          </button>
+          <a
+            className="font-semibold text-teal-700 underline"
+            href={`https://cardanoscan.io/transaction/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on Cardanoscan
+          </a>
+        </div>
       </div>
 
       <div className="rounded-md border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
@@ -470,9 +489,9 @@ function decodeMidnightAddress(address: string): string | null {
     return null
   }
 
-  const decoded = decodeBech32(address)
+  const decoded = decodeBech32(address) ?? decodeBech32m(address)
 
-  if (!decoded || decoded.bytes.length !== 33) {
+  if (!decoded || decoded.hrp !== "mn_dust" || decoded.bytes.length !== 33) {
     return null
   }
 

@@ -7,7 +7,7 @@ You enter a Cardano stake address (or connect your wallet) and the inspector sho
 - Whether your NIGHT is registered for DUST generation
 - How much DUST you are generating and at what rate
 - Whether the Cardano on-chain state matches what the Midnight indexer reports
-- A full history of your registration and de-registration transactions
+- A timeline of available registration and de-registration transactions (provider limits or errors may make it incomplete)
 
 > **Non-custodial.** The tool never asks for your seed phrase or private keys. All wallet actions happen inside your own wallet extension.
 
@@ -15,12 +15,12 @@ You enter a Cardano stake address (or connect your wallet) and the inspector sho
 
 ## What you need
 
-| Requirement                               | Notes                                                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| [Node.js](https://nodejs.org) 18 or newer | Download the LTS version from nodejs.org                                                                |
-| A browser                                 | Chrome, Firefox, Brave, or Edge                                                                         |
-| A Cardano wallet extension                | Optional — needed only to register/deregister. Works with Lace, Eternl, Nami, and other CIP-30 wallets. |
-| A Midnight wallet extension               | Optional — needed only to read your live DUST balance and address.                                      |
+| Requirement                      | Notes                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [Node.js](https://nodejs.org) 22 | Download the LTS version from nodejs.org                                                                |
+| A browser                        | Chrome, Firefox, Brave, or Edge                                                                         |
+| A Cardano wallet extension       | Optional — needed only to register/deregister. Works with Lace, Eternl, Nami, and other CIP-30 wallets. |
+| A Midnight wallet extension      | Optional — needed only to read your live DUST balance and address.                                      |
 
 ---
 
@@ -40,7 +40,7 @@ Or click **Code → Download ZIP** on GitHub, unzip the folder, and open a termi
 **2. Install dependencies**
 
 ```bash
-npm install
+npm ci
 ```
 
 This downloads all required packages into a local `node_modules` folder. Nothing is installed system-wide.
@@ -86,7 +86,7 @@ Click **Connect** in the Midnight section to read your DUST balance, generation 
 ## Safety
 
 - The tool **never asks for your seed phrase or private keys**
-- It **never stores** your wallet data
+- Wallet data is handled in memory for the current session; the app does not persist wallet credentials
 - Stake addresses you inspect are sent to the configured Midnight Indexer and Cardano Koios endpoints so the app can read public status and on-chain history
 - The inspected stake address is reflected in the page URL as `?stake=...` for refresh/share support; the app sends a referrer policy that avoids leaking the full URL to external sites
 - Wallet signing always happens **inside your wallet extension**, not in this app
@@ -133,7 +133,7 @@ Press `Ctrl + C` in the terminal where `npm run dev` is running.
 Make sure `npm run dev` is still running and open [http://localhost:3000](http://localhost:3000) (not https).
 
 **"Cannot find module" error after `npm run dev`**
-Run `npm install` again. This usually fixes missing packages.
+Run `npm ci` again. This usually fixes missing packages.
 
 **Wallet does not appear in the list**
 Make sure the wallet extension is installed and enabled in your browser. Some wallets need to be unlocked first.

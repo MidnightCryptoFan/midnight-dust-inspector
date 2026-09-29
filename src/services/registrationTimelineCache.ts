@@ -40,7 +40,7 @@ export async function inspectRegistrationTimelineCached(
   const entry = cache.get(stakeAddress)
 
   if (entry && now - entry.fetchedAt < CACHE_TTL_MS) {
-    return withCurrentTimestamp(entry.result)
+    return entry.result
   }
 
   if (entry) {
@@ -52,7 +52,7 @@ export async function inspectRegistrationTimelineCached(
         .some((tx) => !entry.knownTxHashes.has(tx.txHash))
       if (!hasNew) {
         cache.set(stakeAddress, { ...entry, fetchedAt: now })
-        return withCurrentTimestamp(entry.result)
+        return entry.result
       }
     } catch {
       // Incremental check failed — fall through to full fetch.
@@ -75,22 +75,11 @@ export async function inspectRegistrationTimelineCached(
   cache.set(stakeAddress, {
     result,
     knownTxHashes: new Set(
-      result.timeline?.events.map((e) => e.txHash) ?? [],
+      result.knownTxHashes ??
+        result.timeline?.events.map((e) => e.txHash) ??
+        [],
     ),
     fetchedAt: now,
   })
   return result
-}
-
-function withCurrentTimestamp(
-  result: RegistrationTimelineInspectionResult,
-): RegistrationTimelineInspectionResult {
-  const checkedAt = new Date().toISOString()
-  return {
-    ...result,
-    timeline: result.timeline ? { ...result.timeline, checkedAt } : null,
-    cardanoAccountSnapshot: result.cardanoAccountSnapshot
-      ? { ...result.cardanoAccountSnapshot, checkedAt }
-      : null,
-  }
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import type { ConnectedWallet } from "@/services/wallet/cip30"
 import type { DustGenerationStatus } from "@/domain/dustStatus"
 import type { ActiveRegistrationsResult } from "@/app/api/active-registrations/route"
-import { decodeBech32, bytesToHex } from "@/lib/bech32"
+import { decodeBech32, decodeBech32m, bytesToHex } from "@/lib/bech32"
 import { KoiosTransportNote, useKoiosThrottle } from "./KoiosThrottleNote"
 
 type Props = {
@@ -23,7 +23,7 @@ type Registration = {
   dustAddress: string | null
   dustAddressHex: string | null
   /** True when this registration's DUST address matches the connected Midnight wallet. */
-  matchesWallet: boolean
+  matchesWallet: boolean | null
   /**
    * False when the registration's c_wallet key is not among the payment keys
    * the connected wallet reported — signing may still succeed (the key can be
@@ -100,9 +100,9 @@ export function DeregisterFlow({
               dustAddress: r.dustAddress,
               dustAddressHex: r.dustAddressHex,
               matchesWallet:
-                connectedDustHex != null &&
-                r.dustAddressHex != null &&
-                r.dustAddressHex.toLowerCase() === connectedDustHex,
+                connectedDustHex == null || r.dustAddressHex == null
+                  ? null
+                  : r.dustAddressHex.toLowerCase() === connectedDustHex,
               ownedByWallet: r.ownedByWallet,
             }))
           : []
@@ -121,7 +121,7 @@ export function DeregisterFlow({
               outputIndex: fallbackOutputIndex,
               dustAddress: indexerStatus?.dustAddress ?? null,
               dustAddressHex: null,
-              matchesWallet: false,
+              matchesWallet: null,
               ownedByWallet: null,
             },
           ]
@@ -142,7 +142,7 @@ export function DeregisterFlow({
         const selected = new Set<string>()
         if (connectedDustHex != null) {
           for (const r of registrations) {
-            if (!r.matchesWallet) selected.add(refKey(r))
+            if (r.matchesWallet === false) selected.add(refKey(r))
           }
         }
 
@@ -175,9 +175,8 @@ export function DeregisterFlow({
     setFlow({ step: "signing", count: queue.length })
 
     try {
-      const { deregisterDust } = await import(
-        "@/services/cardano/dustTransactions.client"
-      )
+      const { deregisterDust } =
+        await import("@/services/cardano/dustTransactions.client")
       const result = await deregisterDust(
         wallet.rawApi,
         queue.map((r) => ({ txHash: r.txHash, outputIndex: r.outputIndex })),
@@ -240,7 +239,11 @@ export function DeregisterFlow({
         {flow.step === "error" ? (
           <ErrorStep
             message={flow.message}
-            onRetry={flow.retry ? () => setFlow({ step: "select", ...flow.retry! }) : undefined}
+            onRetry={
+              flow.retry
+                ? () => setFlow({ step: "select", ...flow.retry! })
+                : undefined
+            }
             onCancel={onCancel}
           />
         ) : null}
@@ -252,8 +255,9 @@ export function DeregisterFlow({
 function decodeMidnightAddressHex(address: string): string | null {
   const trimmed = address.trim()
   if (!trimmed.startsWith("mn_dust1")) return null
-  const decoded = decodeBech32(trimmed)
-  if (!decoded || decoded.bytes.length !== 33) return null
+  const decoded = decodeBech32(trimmed) ?? decodeBech32m(trimmed)
+  if (!decoded || decoded.hrp !== "mn_dust" || decoded.bytes.length !== 33)
+    return null
   return bytesToHex(decoded.bytes).toLowerCase()
 }
 
@@ -281,7 +285,9 @@ function WarningBlock({ multiple }: { multiple: boolean }) {
       <p className="font-semibold">Before you sign</p>
       <ul className="mt-1 list-disc space-y-1 pl-5">
         {multiple ? (
-          <li>All selected registrations are removed in a single transaction.</li>
+          <li>
+            All selected registrations are removed in a single transaction.
+          </li>
         ) : (
           <li>The registration NFT is burned and the script UTxO is spent.</li>
         )}

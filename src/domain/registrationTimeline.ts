@@ -26,6 +26,8 @@ export type RegistrationTimeline = {
   checkedAt: string
   source: "koios"
   scannedTransactionCount: number
+  partial: boolean
+  failedDetailCount: number
   note: string
 }
 
@@ -47,4 +49,5 @@ export type RegistrationTimelineInspectionResult = {
   timeline: RegistrationTimeline | null
   cardanoAccountSnapshot: CardanoAccountSnapshot | null
   controlledError: RegistrationTimelineError | null
+  knownTxHashes?: string[]
 }
