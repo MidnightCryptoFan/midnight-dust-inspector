@@ -148,6 +148,8 @@ function timeline(events: RegistrationEvent[]): RegistrationTimeline {
     checkedAt: CHECKED_AT,
     source: "koios",
     scannedTransactionCount: 25,
+    partial: false,
+    failedDetailCount: 0,
     note: "",
   }
 }

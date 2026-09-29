@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { decodeBech32, bytesToHex } from "@/lib/bech32"
+import { decodeBech32, decodeBech32m, bytesToHex } from "@/lib/bech32"
 import type { ConnectedWallet } from "@/services/wallet/cip30"
 import { KoiosTransportNote, useKoiosThrottle } from "./KoiosThrottleNote"
 
@@ -341,7 +341,9 @@ function SigningStep() {
       </div>
       <div>
         <p className="font-semibold text-slate-950">
-          {waiting ? "Preparing transaction…" : "Waiting for wallet signature..."}
+          {waiting
+            ? "Preparing transaction…"
+            : "Waiting for wallet signature..."}
         </p>
         <p className="mt-1 text-sm text-slate-600">
           {waiting
@@ -470,9 +472,9 @@ function decodeMidnightAddress(address: string): string | null {
     return null
   }
 
-  const decoded = decodeBech32(address)
+  const decoded = decodeBech32(address) ?? decodeBech32m(address)
 
-  if (!decoded || decoded.bytes.length !== 33) {
+  if (!decoded || decoded.hrp !== "mn_dust" || decoded.bytes.length !== 33) {
     return null
   }
 

@@ -34,6 +34,7 @@ export async function inspectRegistrationTimeline(
     const recentTransactions = transactions.slice(0, limit)
 
     let done = 0
+    let failedDetailCount = 0
     const total = recentTransactions.length
     options?.onProgress?.(0, total)
 
@@ -42,6 +43,7 @@ export async function inspectRegistrationTimeline(
         try {
           return await provider.getTransactionDetails(transaction.txHash)
         } catch {
+          failedDetailCount += 1
           return {
             txHash: transaction.txHash,
             blockTime: transaction.blockTime,
@@ -58,17 +60,28 @@ export async function inspectRegistrationTimeline(
       }),
     )
 
+    const timeline = buildRegistrationTimeline({
+      stakeAddress,
+      transactions: recentTransactions,
+      detailsByTxHash: new Map(
+        details.map((detail) => [detail.txHash, detail] as const),
+      ),
+      userAddresses: addresses,
+      checkedAt,
+      source: "koios",
+    })
+    timeline.partial =
+      failedDetailCount > 0 || transactions.length > recentTransactions.length
+    timeline.failedDetailCount = failedDetailCount
+    if (timeline.partial) timeline.activeRegistrationCount = null
+    if (transactions.length > recentTransactions.length) {
+      timeline.note = `Showing ${recentTransactions.length} of ${transactions.length} transactions; older history was not scanned.`
+    }
     return {
-      timeline: buildRegistrationTimeline({
-        stakeAddress,
-        transactions: recentTransactions,
-        detailsByTxHash: new Map(
-          details.map((detail) => [detail.txHash, detail] as const),
-        ),
-        userAddresses: addresses,
-        checkedAt,
-        source: "koios",
-      }),
+      timeline,
+      knownTxHashes: recentTransactions.map(
+        (transaction) => transaction.txHash,
+      ),
       cardanoAccountSnapshot: buildCardanoAccountSnapshot({
         stakeAddress,
         assets,

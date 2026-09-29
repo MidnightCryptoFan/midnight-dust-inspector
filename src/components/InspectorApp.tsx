@@ -102,6 +102,7 @@ export function InspectorApp() {
   const [activeRegistrationLookup, setActiveRegistrationLookup] =
     useState<ActiveRegistrationLookup>({ status: "idle" })
   const [autoRefresh, setAutoRefresh] = useState(false)
+  const inspectionRequestRef = useRef(0)
   const dustGrowthCheckRef = useRef<{
     walletId: string
     phase: "checking" | "done"
@@ -215,6 +216,8 @@ export function InspectorApp() {
   }
 
   function handleWalletDisconnected() {
+    inspectionRequestRef.current += 1
+    setIsLoading(false)
     setConnectedWallet(null)
     setAddress("")
     setInspection(null)
@@ -235,6 +238,7 @@ export function InspectorApp() {
     stakeAddress: string,
     options?: { paymentKeyHashes?: string[] | null },
   ) {
+    const requestId = ++inspectionRequestRef.current
     const validation = validateStakeAddress(stakeAddress)
 
     if (!validation.valid) {
@@ -264,10 +268,14 @@ export function InspectorApp() {
               controlledError: null,
             })
           : inspectRegistrationTimelineCached(validation.address, {
-              onProgress: (done, total) => setScanProgress({ done, total }),
+              onProgress: (done, total) => {
+                if (requestId === inspectionRequestRef.current)
+                  setScanProgress({ done, total })
+              },
             }),
       ])
 
+      if (requestId !== inspectionRequestRef.current) return
       const registrationAddress = await resolveRegistrationAddress(
         result.status?.utxoTxHash ?? null,
         result.status?.utxoOutputIndex ?? null,
@@ -295,6 +303,7 @@ export function InspectorApp() {
         onChainState: null,
         resolvedUtxoRef: null,
       }
+      if (requestId !== inspectionRequestRef.current) return
       setInspection(newInspection)
 
       // Cross-check on-chain state when indexer says registered
@@ -308,19 +317,36 @@ export function InspectorApp() {
             result.status.utxoTxHash,
             result.status.utxoOutputIndex,
             null,
+            requestId,
           )
         } else {
           // Slow path: no UTxO pointer; scan the script address for every
           // registration of this stake account (works without a wallet too).
-          void fetchOnChainState(null, null, {
-            stakeAddress: validation.address,
-            paymentKeyHashes,
-          })
+          void fetchOnChainState(
+            null,
+            null,
+            {
+              stakeAddress: validation.address,
+              paymentKeyHashes,
+            },
+            requestId,
+          )
         }
       }
+    } catch (error) {
+      if (requestId === inspectionRequestRef.current) {
+        setInspection(null)
+        setValidationMessage(
+          error instanceof Error
+            ? error.message
+            : "Inspection could not be completed.",
+        )
+      }
     } finally {
-      setIsLoading(false)
-      setScanProgress(null)
+      if (requestId === inspectionRequestRef.current) {
+        setIsLoading(false)
+        setScanProgress(null)
+      }
     }
   }
 
@@ -328,12 +354,14 @@ export function InspectorApp() {
     utxoTxHash: string | null,
     utxoOutputIndex: string | null,
     account: { stakeAddress: string; paymentKeyHashes: string[] } | null,
+    expectedRequestId: number,
   ) {
     let requestBody: Record<string, unknown>
 
     if (utxoTxHash) {
-      const outputIndex = utxoOutputIndex != null ? Number(utxoOutputIndex) : 0
-      if (!Number.isFinite(outputIndex)) return
+      if (utxoOutputIndex == null) return
+      const outputIndex = Number(utxoOutputIndex)
+      if (!Number.isInteger(outputIndex) || outputIndex < 0) return
       requestBody = { utxoTxHash, utxoOutputIndex: outputIndex }
     } else if (account) {
       requestBody = {
@@ -359,11 +387,13 @@ export function InspectorApp() {
         foundUtxo?: { txHash: string; outputIndex: number }
       }
       setInspection((prev) =>
-        prev ? applyOnChainState(prev, data.state, data.foundUtxo) : prev,
+        expectedRequestId === inspectionRequestRef.current && prev
+          ? applyOnChainState(prev, data.state, data.foundUtxo)
+          : prev,
       )
     } catch {
       setInspection((prev) =>
-        prev
+        expectedRequestId === inspectionRequestRef.current && prev
           ? applyOnChainState(prev, {
               kind: "unknown",
               error: "The Koios on-chain lookup failed.",
@@ -485,7 +515,8 @@ export function InspectorApp() {
                 Midnight DUST Inspector
               </h1>
               <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                Check your DUST generation, cap, wallet link, and registration status.
+                Check your DUST generation, cap, wallet link, and registration
+                status.
               </p>
             </div>
           </div>
@@ -506,33 +537,36 @@ export function InspectorApp() {
 
         {/* Security notice */}
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
-          This tool never asks for your seed phrase or private keys. Wallet connections are read-only unless you explicitly sign a registration transaction inside your wallet.
+          This tool never asks for your seed phrase or private keys. Wallet
+          connections are read-only unless you explicitly sign a registration
+          transaction inside your wallet.
         </div>
 
         {/* Modals */}
-        {showDeregister && connectedWallet && inspection != null && (
-          inspection.status != null ||
-          inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED" ||
-          (inspection.registrationTimeline?.activeRegistrationCount ?? 0) > 1
-        ) && (
-          <DeregisterFlow
-            wallet={connectedWallet}
-            indexerStatus={inspection.status}
-            midnightAddress={midnightDustBalance?.dustAddress ?? null}
-            utxoRef={inspection.resolvedUtxoRef ?? undefined}
-            onSuccess={(txHash) => {
-              setShowDeregister(false)
-              handleTxSuccess(txHash)
-            }}
-            onCancel={() => setShowDeregister(false)}
-          />
-        )}
+        {showDeregister &&
+          connectedWallet &&
+          inspection != null &&
+          (inspection.status != null ||
+            inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED" ||
+            (inspection.registrationTimeline?.activeRegistrationCount ?? 0) >
+              1) && (
+            <DeregisterFlow
+              wallet={connectedWallet}
+              indexerStatus={inspection.status}
+              midnightAddress={midnightDustBalance?.dustAddress ?? null}
+              utxoRef={inspection.resolvedUtxoRef ?? undefined}
+              onSuccess={(txHash) => {
+                setShowDeregister(false)
+                handleTxSuccess(txHash)
+              }}
+              onCancel={() => setShowDeregister(false)}
+            />
+          )}
         {showRegister && connectedWallet && (
           <RegisterFlow
             wallet={connectedWallet}
             initialMidnightAddress={midnightDustBalance?.dustAddress ?? null}
             onSuccess={(txHash) => {
-              setShowRegister(false)
               handleTxSuccess(txHash)
             }}
             onCancel={() => setShowRegister(false)}
@@ -630,8 +664,10 @@ export function InspectorApp() {
                 dustGrowthStatus={dustGrowthStatus}
                 dustCapFull={dustCapFull}
                 multipleRegistrations={
-                  inspection.diagnosis.code === "MULTIPLE_REGISTRATIONS_DETECTED" ||
-                  (inspection.registrationTimeline?.activeRegistrationCount ?? 0) > 1
+                  inspection.diagnosis.code ===
+                    "MULTIPLE_REGISTRATIONS_DETECTED" ||
+                  (inspection.registrationTimeline?.activeRegistrationCount ??
+                    0) > 1
                 }
                 activeRegistrationLookup={activeRegistrationLookup}
                 timeline={inspection.registrationTimeline}
@@ -651,7 +687,8 @@ export function InspectorApp() {
           ) : (
             !isLoading && (
               <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                Enter a Cardano stake address or connect your Cardano wallet to inspect your DUST generation.
+                Enter a Cardano stake address or connect your Cardano wallet to
+                inspect your DUST generation.
               </p>
             )
           )}
@@ -687,7 +724,10 @@ export function InspectorApp() {
               MidnightCryptoFan
             </a>
           </p>
-          <p>This is an independent tool and not an official Midnight Network product.</p>
+          <p>
+            This is an independent tool and not an official Midnight Network
+            product.
+          </p>
         </footer>
 
         {/* Dev: mock scenario */}
