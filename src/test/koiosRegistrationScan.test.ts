@@ -37,9 +37,21 @@ describe("findAllRegistrationUtxosForPaymentKey", () => {
     const provider = new KoiosCardanoChainProvider({
       fetcher: async () =>
         jsonResponse([
-          { tx_hash: "tx1", tx_index: 0, inline_datum: { bytes: datum(KEY_A, DUST_1) } },
-          { tx_hash: "tx2", tx_index: 3, inline_datum: { bytes: datum(KEY_A, DUST_2) } },
-          { tx_hash: "tx3", tx_index: 0, inline_datum: { bytes: datum(KEY_B, DUST_1) } },
+          {
+            tx_hash: "tx1",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_A, DUST_1) },
+          },
+          {
+            tx_hash: "tx2",
+            tx_index: 3,
+            inline_datum: { bytes: datum(KEY_A, DUST_2) },
+          },
+          {
+            tx_hash: "tx3",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_B, DUST_1) },
+          },
           { tx_hash: "tx4", tx_index: 1, inline_datum: null },
         ]),
     })
@@ -56,7 +68,11 @@ describe("findAllRegistrationUtxosForPaymentKey", () => {
     const provider = new KoiosCardanoChainProvider({
       fetcher: async () =>
         jsonResponse([
-          { tx_hash: "tx3", tx_index: 0, inline_datum: { bytes: datum(KEY_B, DUST_1) } },
+          {
+            tx_hash: "tx3",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_B, DUST_1) },
+          },
         ]),
     })
 
@@ -69,8 +85,16 @@ describe("findAllRegistrationUtxosForPaymentKey", () => {
     const provider = new KoiosCardanoChainProvider({
       fetcher: async () =>
         jsonResponse([
-          { tx_hash: "tx1", tx_index: 0, inline_datum: { bytes: datum(KEY_A, DUST_1) } },
-          { tx_hash: "tx2", tx_index: 3, inline_datum: { bytes: datum(KEY_A, DUST_2) } },
+          {
+            tx_hash: "tx1",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_A, DUST_1) },
+          },
+          {
+            tx_hash: "tx2",
+            tx_index: 3,
+            inline_datum: { bytes: datum(KEY_A, DUST_2) },
+          },
         ]),
     })
 
@@ -89,7 +113,11 @@ describe("findAllRegistrationUtxosForPaymentKey", () => {
       inline_datum: { bytes: datum(KEY_B, DUST_1) },
     }))
     const pageTwo = [
-      { tx_hash: "txDeep", tx_index: 1, inline_datum: { bytes: datum(KEY_A, DUST_2) } },
+      {
+        tx_hash: "txDeep",
+        tx_index: 1,
+        inline_datum: { bytes: datum(KEY_A, DUST_2) },
+      },
     ]
 
     const provider = new KoiosCardanoChainProvider({
@@ -154,8 +182,16 @@ describe("findActiveRegistrationsForAccount", () => {
     const provider = new KoiosCardanoChainProvider({
       fetcher: accountFetcher({
         scriptUtxos: [
-          { tx_hash: "tx1", tx_index: 0, inline_datum: { bytes: datum(KEY_A, DUST_1) } },
-          { tx_hash: "tx2", tx_index: 0, inline_datum: { bytes: datum(KEY_B, DUST_2) } },
+          {
+            tx_hash: "tx1",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_A, DUST_1) },
+          },
+          {
+            tx_hash: "tx2",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_B, DUST_2) },
+          },
         ],
       }),
     })
@@ -183,8 +219,16 @@ describe("findActiveRegistrationsForAccount", () => {
       fetcher: accountFetcher({
         accountTxs: [{ tx_hash: "txFunded" }],
         scriptUtxos: [
-          { tx_hash: "txFunded", tx_index: 0, inline_datum: { bytes: datum(KEY_B, DUST_1) } },
-          { tx_hash: "txForeign", tx_index: 0, inline_datum: { bytes: datum(KEY_B, DUST_2) } },
+          {
+            tx_hash: "txFunded",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_B, DUST_1) },
+          },
+          {
+            tx_hash: "txForeign",
+            tx_index: 0,
+            inline_datum: { bytes: datum(KEY_B, DUST_2) },
+          },
         ],
       }),
     })
@@ -210,7 +254,11 @@ describe("findActiveRegistrationsForAccount", () => {
       fetcher: accountFetcher({
         addresses: [ACCOUNT_ADDRESS],
         scriptUtxos: [
-          { tx_hash: "tx1", tx_index: 2, inline_datum: { bytes: datum(KEY_B, DUST_1) } },
+          {
+            tx_hash: "tx1",
+            tx_index: 2,
+            inline_datum: { bytes: datum(KEY_B, DUST_1) },
+          },
         ],
       }),
     })
@@ -229,5 +277,31 @@ describe("findActiveRegistrationsForAccount", () => {
         ownedByWallet: false,
       },
     ])
+  })
+})
+
+describe("getUtxosForAddresses request sizing", () => {
+  test("keeps every Koios address_utxos request below the 5 KiB body cap", async () => {
+    const addresses = Array.from(
+      { length: 80 },
+      (_, index) => `addr1${String(index).padStart(3, "0")}${"q".repeat(100)}`,
+    )
+    const requestBodies: string[] = []
+    const provider = new KoiosCardanoChainProvider({
+      fetcher: async (_input, init) => {
+        requestBodies.push(String(init?.body ?? ""))
+        return jsonResponse([])
+      },
+    })
+
+    await provider.getUtxosForAddresses(addresses)
+
+    expect(requestBodies.length).toBeGreaterThan(1)
+    expect(requestBodies.every((body) => body.length <= 4500)).toBe(true)
+    expect(
+      requestBodies.flatMap(
+        (body) => (JSON.parse(body) as { _addresses: string[] })._addresses,
+      ),
+    ).toEqual(addresses)
   })
 })
