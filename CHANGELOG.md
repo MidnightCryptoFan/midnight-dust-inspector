@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-29
+
+### Fixed
+
+- Offer a Cardano on-chain reverse lookup when the connected Midnight DUST wallet is at cap but the inspected stake address is not reported as registered.
+- Clarify that a full DUST balance and cap do not identify the Cardano stake address backing that wallet.
+
 ## [0.6.1] - 2026-09-29
 
 ### Fixed
