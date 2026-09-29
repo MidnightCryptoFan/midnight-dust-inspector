@@ -336,7 +336,13 @@ describe("tx_info collateral asset_list repair", () => {
   const DATUM_HASH =
     "443a90e5e217934abc5080ba2a18b1d6879472a41960d20f920b97ba114e014b"
   const DATUM_BYTES = "d8799fd8799f581caabbccff5821010203ff"
-  const DATUM_VALUE = {
+  const DATUM_VALUE: {
+    constructor: number
+    fields: Array<
+      | { constructor: number; fields: Array<{ bytes: string }> }
+      | { bytes: string }
+    >
+  } = {
     constructor: 0,
     fields: [
       { constructor: 0, fields: [{ bytes: "aabbcc" }] },

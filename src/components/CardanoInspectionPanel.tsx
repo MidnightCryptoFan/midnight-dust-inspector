@@ -184,7 +184,9 @@ export function CardanoInspectionPanel({
           {timeline.scannedTransactionCount === 1
             ? "transaction"
             : "transactions"}{" "}
-          scanned
+          {timeline.partial
+            ? `scanned · incomplete (${timeline.failedDetailCount} details failed). ${timeline.note}`
+            : "scanned"}
           {timeline.scannedTransactionCount > registrationEvents.length
             ? ` · ${timeline.scannedTransactionCount - registrationEvents.length} not shown (no DUST or NIGHT activity detected)`
             : ""}
@@ -628,9 +630,14 @@ function NotRegisteredActions({
 
       {dustCapFull && !dustIsGrowing && !dustIsChecking && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
-          <p className="font-semibold">DUST cap is full — registration not needed right now.</p>
+          <p className="font-semibold">
+            DUST cap is full — registration not needed right now.
+          </p>
           <p className="mt-1 text-xs">
-            Your Midnight wallet already holds the maximum DUST for your current NIGHT balance. No new DUST can be generated until you spend some DUST on the Midnight network. The registration status discrepancy may also be an indexer sync delay.
+            Your Midnight wallet already holds the maximum DUST for your current
+            NIGHT balance. No new DUST can be generated until you spend some
+            DUST on the Midnight network. The registration status discrepancy
+            may also be an indexer sync delay.
           </p>
         </div>
       )}
@@ -1146,8 +1153,12 @@ function resolveEffectiveState(
   isOnChainLoading: boolean,
 ): EffectiveState {
   if (isOnChainLoading) return { kind: "loading" }
-  if (!indexerStatus || !indexerStatus.registered)
-    return { kind: "not_registered" }
+  if (!indexerStatus)
+    return {
+      kind: "unknown",
+      error: "The Midnight indexer did not return a registration status.",
+    }
+  if (!indexerStatus.registered) return { kind: "not_registered" }
 
   if (!onChainState || onChainState.kind === "unknown") {
     const error =

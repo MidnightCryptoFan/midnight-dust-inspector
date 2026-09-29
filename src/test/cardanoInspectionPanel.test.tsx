@@ -174,6 +174,8 @@ describe("CardanoInspectionPanel registration history", () => {
       checkedAt,
       source: "koios",
       scannedTransactionCount: 1,
+      partial: false,
+      failedDetailCount: 0,
       note: "Test timeline",
     }
   }

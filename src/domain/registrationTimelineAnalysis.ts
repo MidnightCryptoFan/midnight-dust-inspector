@@ -50,6 +50,8 @@ export function buildRegistrationTimeline(input: {
     checkedAt: input.checkedAt,
     source: input.source,
     scannedTransactionCount: input.transactions.length,
+    partial: false,
+    failedDetailCount: 0,
     note: "The timeline is built from public Cardano transaction data. Unknown entries are transactions that could not be confidently identified as a DUST registration or removal from their metadata.",
   }
 }

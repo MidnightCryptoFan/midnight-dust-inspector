@@ -5,7 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.13] – 2026-07-16
+## [Unreleased] - 0.6.1
+
+## [0.6.0] - 2026-09-29
+
+### Security
+
+- Updated Next.js and its ESLint config to 16.3.7, React to 19.3.0, and resolved the remaining dependency advisories. `npm audit` reports no vulnerabilities.
+
+### Fixed
+
+- Accept valid Bech32 and Bech32m Midnight DUST addresses while enforcing the `mn_dust` HRP and payload length.
+- Unknown indexer results remain unknown instead of being presented as a confirmed negative registration.
+- Discard stale inspection responses after a newer request or wallet disconnect, and never guess output index 0 when the indexer omits it.
+- Keep successful registration details visible, including its transaction hash, until the user closes the flow.
+- Mark timelines partial when transaction details fail or the configured scan limit omits older transactions; preserve cache check times and track all scanned transactions.
+- Do not preselect registrations whose DUST destination is unknown during cleanup.
+- Fix the test fixture TypeScript error and add CI checks for typecheck, lint, tests, and build.
+
+### Documentation
+
+- Remove unsupported duplicate-registration repair advice and clarify provider delay, scan completeness, and analytics disclosures.
+- Require Node.js 22 and document reproducible `npm ci` installation.
+
+---
+
+## [0.5.13] â€“ 2026-07-16
 
 ### Fixed
 
@@ -23,7 +48,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.12] – 2026-07-16
+## [0.5.12] â€“ 2026-07-16
 
 ### Fixed
 
@@ -31,7 +56,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `ParseError` on Koios `/tx_info` responses. Koios mainnet currently returns
   `collateral_output.asset_list` as a string and `plutus_contracts` entries
   with null `address`/`bytecode`/`input.datum`, both of which Lucid
-  Evolution's strict response schema rejects — and every DUST registration is
+  Evolution's strict response schema rejects â€” and every DUST registration is
   a Plutus transaction with a collateral return, so every clean-up hit this.
   The client-side Koios transport now repairs these sections (which Lucid
   never consumes) before Lucid parses the response; regular outputs are left
@@ -46,7 +71,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.11] – 2026-07-11
+## [0.5.11] â€“ 2026-07-11
 
 ### Changed
 
@@ -60,15 +85,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.10] – 2026-07-11
+## [0.5.10] â€“ 2026-07-11
 
 ### Fixed
 
 - Registration and de-registration no longer fail with "Transport error" when
   the user's browser cannot reach the Koios API directly (ad-blocker,
   corporate firewall, VPN or ISP block, flaky DNS). Every browser-side Koios
-  request — including Lucid's internal transaction-build calls such as
-  `epoch_params` — now automatically retries through a new server-side relay
+  request â€” including Lucid's internal transaction-build calls such as
+  `epoch_params` â€” now automatically retries through a new server-side relay
   (`/api/koios-proxy`) when the direct connection fails. After three direct
   transport failures the session switches to the relay entirely instead of
   paying a timeout on every request. Direct-from-browser remains the default
@@ -86,7 +111,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.9] – 2026-07-07
+## [0.5.9] â€“ 2026-07-07
 
 ### Fixed
 
@@ -108,14 +133,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.8] – 2026-07-03
+## [0.5.8] â€“ 2026-07-03
 
 ### Fixed
 
 - **Deregistration now finds every registration of the stake account, not just
   the one matching the wallet's current change key.** The history view always
   identified the user by stake account, but deletion searched the script
-  datums for a single payment key hash — the current change address key.
+  datums for a single payment key hash â€” the current change address key.
   Multi-address wallets rotate payment keys, so registrations created earlier
   (often with a then-unused change key that never appeared on-chain) were
   shown in the history but reported as "No active registration UTxO was found"
@@ -127,7 +152,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the DUST registration script now holds 3000+ UTxOs, so single-request scans
   missed registrations beyond the first page. All potentially large Koios
   queries (script scan, account addresses/assets/transactions, address UTxOs)
-  now follow pagination — remaining pages are fetched in parallel using the
+  now follow pagination â€” remaining pages are fetched in parallel using the
   Content-Range row count, with a sequential tail guard.
 - **Deregistration required signers are read from each registration's datum.**
   The spend validator's `check_auth` demands the datum's own `c_wallet` key in
@@ -138,12 +163,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The on-chain registration cross-check works without a connected wallet now
   (it scans by stake account) and no longer reports "deregistration pending"
   for accounts whose registration is bound to a rotated key.
-- Script payment credentials (addr1z…/odd address types) are no longer treated
+- Script payment credentials (addr1zâ€¦/odd address types) are no longer treated
   as signable payment keys when deriving key hashes from addresses.
 
 ### Changed
 
-- `deregisterDust` drops its `paymentKeyHash` parameter — required signers are
+- `deregisterDust` drops its `paymentKeyHash` parameter â€” required signers are
   derived per UTxO from the on-chain datum.
 - `/api/active-registrations` accepts `stakeAddress` and `paymentKeyHashes[]`
   (the legacy single `paymentKeyHash` is still accepted) and returns each
@@ -154,7 +179,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.7] – 2026-06-30
+## [0.5.7] â€“ 2026-06-30
 
 ### Fixed
 
@@ -167,7 +192,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.6] – 2026-06-30
+## [0.5.6] â€“ 2026-06-30
 
 ### Fixed
 
@@ -183,7 +208,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.5] – 2026-06-24
+## [0.5.5] â€“ 2026-06-24
 
 ### Added
 
@@ -206,19 +231,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The deregistration fallback no longer assumes output index `0` when only a
-  transaction hash is known — without a definite output index the UTxO is not
+  transaction hash is known â€” without a definite output index the UTxO is not
   offered, since a UTxO is identified by `txHash` **and** `outputIndex`.
 
 ---
 
-## [0.5.4] – 2026-06-24
+## [0.5.4] â€“ 2026-06-24
 
 ### Added
 
 - The Deregister flow can now clean up **multiple DUST registrations** at once.
   It scans the registration script directly for every active registration of
   the connected wallet, lists each with its DUST address, and lets you remove
-  several in one pass — one transaction per registration, since the contract
+  several in one pass â€” one transaction per registration, since the contract
   burns exactly one registration token per transaction. The registration
   matching your connected Midnight wallet is kept by default; duplicates are
   pre-selected for removal, with a progress indicator while signing.
@@ -231,7 +256,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.5.3] – 2026-06-14
+## [0.5.3] â€“ 2026-06-14
 
 ### Added
 
@@ -247,37 +272,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Footer version no longer shows the pre-release suffix (`-dev`) duplicated
-  alongside the channel badge — e.g. "v0.5.3-devdev" now correctly shows
+  alongside the channel badge â€” e.g. "v0.5.3-devdev" now correctly shows
   "v0.5.3 dev".
 - Stake key extracted from a payment address is now shown in truncated form in
-  the validation note (`stake1u8ese…etxq` style) to avoid wrapping on small screens.
+  the validation note (`stake1u8eseâ€¦etxq` style) to avoid wrapping on small screens.
 
 ---
 
-## [0.5.2] – 2026-06-14
+## [0.5.2] â€“ 2026-06-14
 
 ### Fixed
 
 - NIGHT transfer amounts in the registration timeline showed inflated values
   (e.g. 9.62k, 7.22k, 4.81k) instead of the correct single-tranche amount
-  (~2.41k). Vesting contract addresses (`addr1z…`) embed the user's stake key
+  (~2.41k). Vesting contract addresses (`addr1zâ€¦`) embed the user's stake key
   and were therefore counted as user-owned outputs, inflating every release
   event. Fixed by restricting NIGHT input/output accounting to key-payment
-  addresses (`addr1q`, `addr1v`) only — script-controlled addresses are now
+  addresses (`addr1q`, `addr1v`) only â€” script-controlled addresses are now
   excluded from the nightIn/nightOut calculation.
 
 ---
 
-## [0.5.1] – 2026-06-13
+## [0.5.1] â€“ 2026-06-13
 
 ### Fixed
 
 - TypeScript build error: `dustCapFull` prop missing in the preview page
-  `CardanoInspectionPanel` usage — caused Vercel production builds to fail
+  `CardanoInspectionPanel` usage â€” caused Vercel production builds to fail
 
 ---
 
-## [0.5.0] – 2026-06-13
+## [0.5.0] â€“ 2026-06-13
 
 ### Added
 
@@ -301,7 +326,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   detected, DUST cap, what happens during registration
 - "Support this tool" panel moved to after the FAQ section
 - "Connect Lace" fallback button replaced by plain "Scan again" in both the
-  Cardano and Midnight no-wallet states — no wallet-specific connect button is
+  Cardano and Midnight no-wallet states â€” no wallet-specific connect button is
   shown when no wallet is detected
 - NIGHT-stays-in-wallet notice separated into its own line and made more explicit
   in the Midnight wallet panel
@@ -319,7 +344,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - "Register now" button is now disabled and replaced with an explanatory notice
-  when the connected Midnight wallet shows DUST balance ≥ DUST cap; the full cap
+  when the connected Midnight wallet shows DUST balance â‰¥ DUST cap; the full cap
   indicates existing DUST accumulation and registering again would not be
   actionable
 
@@ -329,7 +354,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.4.0] – 2026-06-12
+## [0.4.0] â€“ 2026-06-12
 
 ### Added
 
@@ -338,7 +363,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   page load; URL is updated after every successful lookup for easy sharing
 - DUST icon displayed in the page header, spanning both title lines
 - DUST generation rate from the Midnight indexer shown as a summary tile in the
-  Cardano panel — visible without a Midnight wallet connected
+  Cardano panel â€” visible without a Midnight wallet connected
 - Auto-refresh toggle (60-second interval) for the Cardano inspection panel,
   placed in the connected wallet header below Disconnect
 - Auto-refresh toggle (60-second interval) for the Midnight wallet panel,
@@ -351,7 +376,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.3.1] – 2026-06-12
+## [0.3.1] â€“ 2026-06-12
 
 ### Added
 
@@ -364,16 +389,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.3.0] – 2026-06-12
+## [0.3.0] â€“ 2026-06-12
 
 ### Added
 
 - Channel badge in the footer (`dev` / `rc` / empty = stable), driven by
-  `NEXT_PUBLIC_APP_CHANNEL` in `next.config.ts` — value differs per branch
+  `NEXT_PUBLIC_APP_CHANNEL` in `next.config.ts` â€” value differs per branch
 
 ---
 
-## [0.2.0] – 2026-06-12
+## [0.2.0] â€“ 2026-06-12
 
 ### Added
 
@@ -386,18 +411,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Address input now accepts full Cardano payment addresses (`addr1…`) in
-  addition to stake addresses (`stake1…`); the stake key is extracted
+- Address input now accepts full Cardano payment addresses (`addr1â€¦`) in
+  addition to stake addresses (`stake1â€¦`); the stake key is extracted
   automatically and the label/description text reflects this
 - Generation rate panel now shows an informational notice when the Midnight
   indexer confirms an active registration but the 10-second wallet measurement
-  returns zero — this happens with very small NIGHT balances where the per-10 s
+  returns zero â€” this happens with very small NIGHT balances where the per-10 s
   DUST increment is below one atomic unit
 - Default transaction scan limit raised from 25 to 100
 
 ---
 
-## [0.1.0] – 2026-05-01
+## [0.1.0] â€“ 2026-05-01
 
 ### Added
 
