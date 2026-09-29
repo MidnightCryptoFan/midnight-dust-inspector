@@ -5,7 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] - 0.6.1
+## [Unreleased]
+
+## [0.6.1] - 2026-09-29
+
+### Fixed
+
+- Split Koios `address_utxos` requests by serialized payload size (4,500 bytes max) instead of address count, preventing HTTP 413 responses for accounts with many addresses.
+- Added regression coverage confirming all addresses are scanned in request bodies below Koios' 5 KiB limit.
 
 ## [0.6.0] - 2026-09-29
 
