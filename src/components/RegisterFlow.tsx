@@ -384,6 +384,23 @@ function SuccessStep({
           Transaction hash
         </p>
         <p className="break-all font-mono text-xs text-slate-600">{txHash}</p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <button
+            className="font-semibold text-teal-700 underline"
+            type="button"
+            onClick={() => void navigator.clipboard.writeText(txHash)}
+          >
+            Copy transaction ID
+          </button>
+          <a
+            className="font-semibold text-teal-700 underline"
+            href={`https://cardanoscan.io/transaction/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on Cardanoscan
+          </a>
+        </div>
       </div>
 
       <div className="rounded-md border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
