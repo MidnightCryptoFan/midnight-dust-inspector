@@ -152,6 +152,7 @@ export function CardanoInspectionPanel({
           midnightAddress={midnightAddress}
           dustGrowthStatus={dustGrowthStatus}
           dustCapFull={dustCapFull}
+          indexerStatus={indexerStatus}
           activeRegistrationLookup={activeRegistrationLookup}
           recentActivity={recentActivity}
           onRegister={onRegister}
@@ -556,6 +557,7 @@ function NotRegisteredActions({
   midnightAddress,
   dustGrowthStatus,
   dustCapFull,
+  indexerStatus,
   activeRegistrationLookup,
   recentActivity,
   onRegister,
@@ -566,6 +568,7 @@ function NotRegisteredActions({
   midnightAddress: string | null
   dustGrowthStatus: DustGrowthStatus
   dustCapFull: boolean
+  indexerStatus: DustGenerationStatus | null
   activeRegistrationLookup: ActiveRegistrationLookup
   recentActivity: RegistrationEvent | null
   onRegister: () => void
@@ -631,14 +634,38 @@ function NotRegisteredActions({
       {dustCapFull && !dustIsGrowing && !dustIsChecking && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
           <p className="font-semibold">
-            DUST cap is full — registration not needed right now.
+            DUST wallet is at its reported cap.
           </p>
           <p className="mt-1 text-xs">
-            Your Midnight wallet already holds the maximum DUST for your current
-            NIGHT balance. No new DUST can be generated until you spend some
-            DUST on the Midnight network. The registration status discrepancy
-            may also be an indexer sync delay.
+            Your Midnight wallet already holds the maximum DUST for its current
+            NIGHT backing. This does not confirm that the Cardano stake address
+            checked below is the address backing this DUST wallet.
           </p>
+          {indexerStatus?.registered !== true && midnightAddress && (
+            <>
+              <p className="mt-2 text-xs">
+                The Midnight indexer does not report an active registration for
+                this Cardano stake address. Scan Cardano&apos;s current
+                registration outputs to find whether another stake address is
+                backing this DUST wallet.
+              </p>
+              <button
+                className="mt-3 rounded-md border border-violet-300 bg-white px-3 py-1.5 text-xs font-semibold text-violet-900 transition hover:bg-violet-100 disabled:cursor-wait disabled:opacity-70 dark:border-violet-700 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/60"
+                disabled={activeRegistrationLookup.status === "loading"}
+                type="button"
+                onClick={onFindActiveSource}
+              >
+                {activeRegistrationLookup.status === "loading"
+                  ? "Scanning Cardano registrations..."
+                  : "Find the Cardano source for this DUST wallet"}
+              </button>
+              <ActiveSourceLookupResult
+                lookup={activeRegistrationLookup}
+                recentActivity={recentActivity}
+                onInspectActiveSource={onInspectActiveSource}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -720,16 +747,17 @@ function ActiveSourceLookupResult({
   if (lookup.status === "not_found") {
     return (
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
-        <p className="font-semibold">No active on-chain source found.</p>
+        <p className="font-semibold">No active Cardano source found.</p>
         <p className="mt-1 text-xs">
-          DUST is still growing, but no unspent registration UTxO was found for
-          this Midnight address. That usually means Cardano already removed the
-          registration and the Midnight wallet/indexer is still catching up.
+          The Cardano scan found no unspent registration output for this
+          Midnight DUST address. The wallet&apos;s DUST balance and cap alone
+          cannot identify which Cardano stake address, if any, currently backs
+          it.
         </p>
         <p className="mt-2 text-xs">
-          Wait before registering again: first useful re-check is about 1 hour
-          after the latest registration change, and normal catch-up can take up
-          to 24 hours.
+          Do not register again based only on the DUST balance. Check that the
+          Cardano scan completed successfully and review the latest
+          registration transactions first.
         </p>
         {recentActivity?.blockTime ? (
           <p className="mt-2 text-xs">
