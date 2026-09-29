@@ -44,6 +44,43 @@ afterEach(() => {
 })
 
 describe("CardanoInspectionPanel active source lookup", () => {
+  test("offers reverse lookup when the DUST cap is full but the inspected stake is inactive", () => {
+    const onFindActiveSource = vi.fn()
+
+    render(
+      <CardanoInspectionPanel
+        activeRegistrationLookup={{ status: "idle" }}
+        dustGrowthStatus="stable"
+        dustCapFull
+        multipleRegistrations={false}
+        indexerStatus={inactiveStatus}
+        isOnChainLoading={false}
+        midnightAddress="mn_dust1mockdustaddress000000000000000000000000"
+        onChainState={null}
+        onDeregister={vi.fn()}
+        onFindActiveSource={onFindActiveSource}
+        onInspectActiveSource={vi.fn()}
+        onRefresh={vi.fn()}
+        onRegister={vi.fn()}
+        recentActivity={null}
+        snapshot={null}
+        timeline={null}
+        timelineError={null}
+        walletConnected
+      />,
+    )
+
+    expect(
+      screen.getByText(/does not confirm that the Cardano stake address/i),
+    ).toBeTruthy()
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Find the Cardano source for this DUST wallet",
+      }),
+    )
+    expect(onFindActiveSource).toHaveBeenCalledOnce()
+  })
+
   test("lets the user find and inspect the active source when DUST is growing elsewhere", () => {
     const onFindActiveSource = vi.fn()
     const onInspectActiveSource = vi.fn()
@@ -90,7 +127,7 @@ describe("CardanoInspectionPanel active source lookup", () => {
     expect(onInspectActiveSource).toHaveBeenCalledWith(sourceStakeAddress)
   })
 
-  test("explains indexer catch-up when no active source is found while DUST grows", () => {
+  test("explains that a full DUST balance does not reveal its Cardano source", () => {
     const recentRemoval: RegistrationEvent = {
       type: "registration_removed",
       txHash:
@@ -134,12 +171,9 @@ describe("CardanoInspectionPanel active source lookup", () => {
       />,
     )
 
-    expect(screen.getByText("No active on-chain source found.")).toBeTruthy()
+    expect(screen.getByText("No active Cardano source found.")).toBeTruthy()
     expect(
-      screen.getByText(/wallet\/indexer is still catching up/),
-    ).toBeTruthy()
-    expect(
-      screen.getByText(/normal catch-up can take up to 24 hours/),
+      screen.getByText(/DUST balance and cap alone cannot identify/i),
     ).toBeTruthy()
     expect(
       screen.getByText(/Latest registration change seen here/),
