@@ -79,7 +79,7 @@ Click **Connect** in the Cardano section and choose your wallet extension. This 
 
 ### Connect your Midnight wallet
 
-Click **Connect** in the Midnight section to read your DUST balance, generation rate, and DUST address. This is read-only — the tool cannot submit Midnight transactions.
+Click **Connect** in the Midnight section to read your DUST balance, capacity cap, and DUST address. This is read-only — the tool cannot submit Midnight transactions.
 
 ---
 
@@ -97,11 +97,14 @@ Click **Connect** in the Midnight section to read your DUST balance, generation 
 
 ## Configuration
 
-The file `.env.local` controls which endpoints the app uses. The defaults work for Midnight mainnet.
+The file `.env.local` controls which endpoints the app uses. Midnight mainnet indexer requests use Blockfrost because the former public Midnight indexer was retired. Blockfrost includes Midnight in its free plan (currently 50,000 requests per day with no credit card required), so visitors do not pay and do not need their own account. The project token stays on the server.
 
 ```bash
-# Midnight Indexer (GraphQL)
-NEXT_PUBLIC_MIDNIGHT_INDEXER_URL=https://indexer.mainnet.midnight.network/api/v4/graphql
+# Free Blockfrost Midnight project token (server-only)
+MIDNIGHT_BLOCKFROST_PROJECT_ID=your_project_token
+
+# Optional: use your own GraphQL indexer instead
+# MIDNIGHT_INDEXER_URL=https://your-indexer.example/graphql
 
 # Midnight network
 NEXT_PUBLIC_MIDNIGHT_NETWORK_ID=mainnet
@@ -117,7 +120,7 @@ CARDANO_NIGHT_POLICY_ID=0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa
 CARDANO_NIGHT_ASSET_NAME=4e49474854
 ```
 
-You only need to change these if you run your own indexer or a private Cardano data provider.
+Create one free Midnight project in Blockfrost and put its token in `.env.local`. Do not prefix the variable with `NEXT_PUBLIC_`; that would expose the token to browsers. You only need to change the endpoint variables if you run your own indexer or a private Cardano data provider.
 
 ---
 

@@ -10,6 +10,11 @@ type Fetcher = (
   init?: RequestInit,
 ) => Promise<Response>
 
+const DEFAULT_BLOCKFROST_INDEXER_URL =
+  "https://midnight-mainnet.blockfrost.io/api/v0"
+const RETIRED_INDEXER_HOST = "indexer.mainnet.midnight.network"
+const INDEXER_TIMEOUT_MS = 15_000
+
 const DUST_GENERATION_STATUS_QUERY = `
 query DustGenerationStatus($cardanoRewardAddresses: [CardanoRewardAddress!]!) {
   dustGenerationStatus(cardanoRewardAddresses: $cardanoRewardAddresses) {
@@ -105,45 +110,59 @@ export async function inspectDustGenerationStatus(
     )
   }
 
-  const indexerUrl =
-    process.env.MIDNIGHT_INDEXER_URL ??
-    process.env.NEXT_PUBLIC_MIDNIGHT_INDEXER_URL
+  const indexerConfiguration = resolveIndexerConfiguration()
 
-  if (!indexerUrl) {
+  if (!indexerConfiguration.ok) {
     return createErrorResult({
       code: "CONFIGURATION_ERROR",
-      message: "NEXT_PUBLIC_MIDNIGHT_INDEXER_URL is not configured.",
-      userMessage: "The indexer endpoint is not configured yet.",
-      technicalDetails: [
-        "Set NEXT_PUBLIC_MIDNIGHT_INDEXER_URL to the public Midnight Indexer GraphQL endpoint.",
-      ],
+      message: indexerConfiguration.message,
+      userMessage:
+        "The free Midnight indexer connection is not configured yet.",
+      technicalDetails: indexerConfiguration.technicalDetails,
       checkedAt,
       raw: null,
     })
   }
 
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => abortController.abort(), INDEXER_TIMEOUT_MS)
+
   try {
-    const response = await (options?.fetcher ?? fetch)(indexerUrl, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
+    const response = await (options?.fetcher ?? fetch)(
+      indexerConfiguration.url,
+      {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          ...indexerConfiguration.headers,
+        },
+        body: JSON.stringify({
+          query: DUST_GENERATION_STATUS_QUERY,
+          variables: { cardanoRewardAddresses: [stakeAddress] },
+        }),
+        cache: "no-store",
+        signal: abortController.signal,
       },
-      body: JSON.stringify({
-        query: DUST_GENERATION_STATUS_QUERY,
-        variables: { cardanoRewardAddresses: [stakeAddress] },
-      }),
-      cache: "no-store",
-    })
+    )
 
     const rawResponse = await readResponseBody(response)
 
     if (!response.ok) {
+      const endpointRetired = response.status === 410
+
       return createErrorResult({
-        code: "HTTP_ERROR",
+        code: endpointRetired ? "CONFIGURATION_ERROR" : "HTTP_ERROR",
         message: `The indexer returned HTTP ${response.status}.`,
-        userMessage: "The Midnight indexer could not be reached successfully.",
-        technicalDetails: [`HTTP status: ${response.status}`],
+        userMessage: endpointRetired
+          ? "The configured Midnight indexer endpoint has been retired."
+          : "The Midnight indexer could not be reached successfully.",
+        technicalDetails: endpointRetired
+          ? [
+              "The legacy Midnight mainnet indexer was retired.",
+              "Configure MIDNIGHT_BLOCKFROST_PROJECT_ID for the free Blockfrost endpoint.",
+            ]
+          : [`HTTP status: ${response.status}`],
         checkedAt,
         raw: rawResponse,
       })
@@ -199,20 +218,86 @@ export async function inspectDustGenerationStatus(
       controlledError: null,
     }
   } catch (error) {
+    const requestTimedOut =
+      error instanceof Error && error.name === "AbortError"
+
     return createErrorResult({
       code: "NETWORK_ERROR",
-      message:
-        error instanceof Error
+      message: requestTimedOut
+        ? `The indexer request timed out after ${INDEXER_TIMEOUT_MS / 1000} seconds.`
+        : error instanceof Error
           ? error.message
           : "The indexer request did not complete.",
-      userMessage: "The Midnight indexer could not be reached.",
-      technicalDetails: ["The browser could not complete the indexer request."],
+      userMessage: requestTimedOut
+        ? "The Midnight indexer did not respond in time."
+        : "The Midnight indexer could not be reached.",
+      technicalDetails: [
+        requestTimedOut
+          ? "The server stopped the indexer request after 15 seconds."
+          : "The server could not complete the indexer request.",
+      ],
       checkedAt,
       raw:
         error instanceof Error
           ? { name: error.name, message: error.message }
           : error,
     })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+type IndexerConfiguration =
+  | {
+      ok: true
+      url: string
+      headers: Record<string, string>
+    }
+  | {
+      ok: false
+      message: string
+      technicalDetails: string[]
+    }
+
+function resolveIndexerConfiguration(): IndexerConfiguration {
+  const configuredUrl = process.env.MIDNIGHT_INDEXER_URL?.trim()
+  const projectId = process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID?.trim()
+
+  if (configuredUrl && !isRetiredIndexerUrl(configuredUrl)) {
+    return {
+      ok: true,
+      url: configuredUrl,
+      headers: projectId ? { project_id: projectId } : {},
+    }
+  }
+
+  if (projectId) {
+    return {
+      ok: true,
+      url: DEFAULT_BLOCKFROST_INDEXER_URL,
+      headers: { project_id: projectId },
+    }
+  }
+
+  return {
+    ok: false,
+    message: configuredUrl
+      ? "The configured Midnight indexer endpoint has been retired."
+      : "MIDNIGHT_BLOCKFROST_PROJECT_ID is not configured.",
+    technicalDetails: [
+      configuredUrl
+        ? "Remove the retired MIDNIGHT_INDEXER_URL setting."
+        : "No server-side Midnight indexer credential was found.",
+      "Set MIDNIGHT_BLOCKFROST_PROJECT_ID to a free Blockfrost Midnight project token, or set MIDNIGHT_INDEXER_URL to your own GraphQL endpoint.",
+    ],
+  }
+}
+
+function isRetiredIndexerUrl(value: string): boolean {
+  try {
+    return new URL(value).hostname === RETIRED_INDEXER_HOST
+  } catch {
+    return false
   }
 }
 
