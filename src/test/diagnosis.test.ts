@@ -22,6 +22,7 @@ const baseStatus: DustGenerationStatus = {
   currentCapacity: "10",
   utxoTxHash: "mock-registration-tx-hash",
   utxoOutputIndex: "0",
+  registrations: [],
   raw: {},
   source: "midnight-indexer",
   checkedAt: "2026-06-06T00:00:00.000Z",
@@ -99,6 +100,39 @@ describe("diagnoseDustStatus", () => {
 
     expect(diagnosis.code).toBe("MULTIPLE_REGISTRATIONS_DETECTED")
     expect(diagnosis.severity).toBe("error")
+  })
+
+  test("classifies multiple registrations from structured indexer data", () => {
+    const diagnosis = diagnoseDustStatus({
+      ...baseStatus,
+      registrations: [
+        {
+          dustAddress: "mn_dust1first",
+          valid: false,
+          nightBalance: "500",
+          generationRate: "0",
+          maxCapacity: "0",
+          currentCapacity: "0",
+          utxoTxHash: "first-registration",
+          utxoOutputIndex: "0",
+        },
+        {
+          dustAddress: "mn_dust1second",
+          valid: false,
+          nightBalance: "500",
+          generationRate: "0",
+          maxCapacity: "0",
+          currentCapacity: "0",
+          utxoTxHash: "second-registration",
+          utxoOutputIndex: "1",
+        },
+      ],
+    })
+
+    expect(diagnosis.code).toBe("MULTIPLE_REGISTRATIONS_DETECTED")
+    expect(diagnosis.technicalDetails).toContain(
+      "The indexer returned 2 active registration mappings.",
+    )
   })
 
   test("classifies a missing DUST address", () => {

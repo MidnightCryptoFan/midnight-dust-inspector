@@ -4,7 +4,10 @@ import type {
   VestingSchedule,
 } from "@/domain/cardanoAccount"
 import type { OnChainRegistrationState } from "@/domain/onChainRegistration"
-import type { DustGenerationStatus } from "@/domain/dustStatus"
+import type {
+  DustGenerationStatus,
+  DustRegistrationStatus,
+} from "@/domain/dustStatus"
 import type {
   RegistrationEvent,
   RegistrationTimeline,
@@ -26,9 +29,20 @@ export type ActiveRegistrationLookup =
   | {
       status: "found"
       stakeAddress: string | null
+      candidateStakeAddresses: string[]
+      confidence:
+        | "indexer_verified"
+        | "credential_match"
+        | "ambiguous"
+        | "unresolved"
       paymentKeyHash: string | null
       txHash: string
       outputIndex: number
+      registrationUtxos: Array<{
+        txHash: string
+        outputIndex: number
+        paymentKeyHash: string
+      }>
     }
   | { status: "not_found"; reason: string }
 
@@ -123,6 +137,17 @@ export function CardanoInspectionPanel({
         generationRate={indexerStatus?.generationRate ?? null}
       />
 
+      {indexerStatus &&
+        (indexerStatus.registrations.length > 1 ||
+          indexerStatus.registrations.some(
+            (registration) => !registration.valid,
+          )) && (
+          <RegistrationMappings
+            registrations={indexerStatus.registrations}
+            connectedDustAddress={midnightAddress}
+          />
+        )}
+
       {effectiveState.kind === "registered_active" && registeredDustAddress && (
         <RegisteredDustAddress
           address={registeredDustAddress}
@@ -197,6 +222,59 @@ export function CardanoInspectionPanel({
             : ""}
         </p>
       )}
+    </div>
+  )
+}
+
+function RegistrationMappings({
+  registrations,
+  connectedDustAddress,
+}: {
+  registrations: DustRegistrationStatus[]
+  connectedDustAddress: string | null
+}) {
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-950 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+      <p className="font-semibold">
+        {registrations.length} active Cardano → Midnight mappings found
+      </p>
+      <p className="mt-1 text-xs leading-5">
+        Exactly one mapping must remain. Compare every destination with the
+        connected Midnight wallet before removing duplicates.
+      </p>
+      <div className="mt-3 space-y-2">
+        {registrations.map((registration, index) => {
+          const matchesConnectedWallet =
+            connectedDustAddress !== null &&
+            registration.dustAddress.toLowerCase() ===
+              connectedDustAddress.toLowerCase()
+
+          return (
+            <div
+              className="rounded border border-red-200 bg-white/80 p-3 dark:border-red-900 dark:bg-slate-900/60"
+              key={`${registration.utxoTxHash ?? "registration"}-${registration.utxoOutputIndex ?? index}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">Mapping {index + 1}</span>
+                <span className="text-xs">
+                  {matchesConnectedWallet
+                    ? "✓ Connected Midnight wallet"
+                    : registration.valid
+                      ? "Valid"
+                      : "Invalid while duplicates exist"}
+                </span>
+              </div>
+              <p className="mt-1 break-all font-mono text-xs">
+                {registration.dustAddress}
+              </p>
+              <p className="mt-1 break-all font-mono text-[11px] opacity-75">
+                UTxO: {registration.utxoTxHash ?? "not reported"}#
+                {registration.utxoOutputIndex ?? "?"}
+              </p>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -767,17 +845,46 @@ function ActiveSourceLookupResult({
     )
   }
 
+  const sourceResolved = lookup.stakeAddress !== null
+  const verificationLabel =
+    lookup.confidence === "indexer_verified"
+      ? "Verified against Midnight's active registration data"
+      : lookup.confidence === "credential_match"
+        ? "Matched to the exact Cardano credential in the registration"
+        : lookup.confidence === "ambiguous"
+          ? "Several Cardano stake addresses are possible"
+          : "The Cardano stake address could not be resolved safely"
+
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm leading-6 text-teal-900 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-300">
-      <p className="font-semibold">Active registration source found.</p>
+    <div
+      className={`rounded-lg border p-4 text-sm leading-6 ${
+        sourceResolved
+          ? "border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-300"
+          : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+      }`}
+    >
+      <p className="font-semibold">
+        {sourceResolved
+          ? "Active registration source found."
+          : "Active registration found; Cardano source needs confirmation."}
+      </p>
+      <p className="mt-1 text-xs">{verificationLabel}.</p>
       <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
         <LookupDetail
           label="Registered stake address"
           value={lookup.stakeAddress ?? "Could not resolve"}
         />
         <LookupDetail
-          label="Registration UTxO"
-          value={`${lookup.txHash.slice(0, 12)}...${lookup.txHash.slice(-8)}#${lookup.outputIndex}`}
+          label={
+            lookup.registrationUtxos.length === 1
+              ? "Registration UTxO"
+              : "Registration UTxOs"
+          }
+          value={
+            lookup.registrationUtxos.length === 1
+              ? `${lookup.txHash.slice(0, 12)}...${lookup.txHash.slice(-8)}#${lookup.outputIndex}`
+              : String(lookup.registrationUtxos.length)
+          }
         />
         <LookupDetail
           label="Payment key hash"
@@ -793,10 +900,32 @@ function ActiveSourceLookupResult({
           Inspect source
         </button>
       ) : (
-        <p className="mt-2 text-xs">
-          The active registration UTxO exists, but its stake address could not
-          be resolved from the registration transaction inputs.
-        </p>
+        <div className="mt-3 text-xs">
+          <p>
+            The registration UTxO exists, but the Inspector will not guess an
+            owner from an unrelated transaction input.
+          </p>
+          {lookup.candidateStakeAddresses.length > 0 && (
+            <div className="mt-2 space-y-2">
+              <p className="font-semibold">Possible stake addresses:</p>
+              {lookup.candidateStakeAddresses.map((stakeAddress) => (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white/70 p-2 dark:border-amber-800 dark:bg-slate-900/50"
+                  key={stakeAddress}
+                >
+                  <span className="break-all font-mono">{stakeAddress}</span>
+                  <button
+                    className="rounded border border-amber-400 px-2 py-1 font-semibold transition hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-950/60"
+                    type="button"
+                    onClick={() => onInspectActiveSource(stakeAddress)}
+                  >
+                    Inspect candidate
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

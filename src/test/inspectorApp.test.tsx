@@ -64,6 +64,7 @@ const registeredWithoutUtxo: DustGenerationStatus = {
   currentCapacity: "0",
   utxoTxHash: null,
   utxoOutputIndex: null,
+  registrations: [],
   raw: {},
   source: "midnight-indexer",
   checkedAt: "2026-06-06T00:00:00.000Z",

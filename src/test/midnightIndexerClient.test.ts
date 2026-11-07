@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
-import { inspectDustGenerationStatus } from "@/services/midnightIndexerClient"
+import {
+  findStakeAddressesForDustAddress,
+  inspectDustGenerationStatus,
+} from "@/services/midnightIndexerClient"
 
 const stakeAddress =
   "stake1u8eseh2482k5e3a65sy9xsakzjl497zt5elwfh7q3u8k54g7yetxq"
@@ -94,5 +97,106 @@ describe("Midnight indexer configuration", () => {
       code: "CONFIGURATION_ERROR",
       message: "The configured Midnight indexer endpoint has been retired.",
     })
+  })
+})
+
+describe("Midnight registration mappings", () => {
+  test("returns every active mapping reported for a Cardano stake address", async () => {
+    vi.stubEnv("MIDNIGHT_BLOCKFROST_PROJECT_ID", "secret-project-token")
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        data: {
+          dustGenerationStatus: [
+            {
+              cardanoRewardAddress: stakeAddress,
+              registered: false,
+              dustAddress: null,
+              nightBalance: "0",
+              generationRate: "0",
+              maxCapacity: "0",
+              currentCapacity: "0",
+              utxoTxHash: null,
+              utxoOutputIndex: null,
+            },
+          ],
+          dustGenerations: [
+            {
+              cardanoRewardAddress: stakeAddress,
+              registrations: [
+                {
+                  dustAddress: "mn_dust1first",
+                  valid: false,
+                  nightBalance: "10",
+                  generationRate: "0",
+                  maxCapacity: "50",
+                  currentCapacity: "50",
+                  utxoTxHash: "first-tx",
+                  utxoOutputIndex: 0,
+                },
+                {
+                  dustAddress: "mn_dust1second",
+                  valid: false,
+                  nightBalance: "20",
+                  generationRate: "0",
+                  maxCapacity: "100",
+                  currentCapacity: "100",
+                  utxoTxHash: "second-tx",
+                  utxoOutputIndex: 1,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    )
+
+    const result = await inspectDustGenerationStatus(stakeAddress, { fetcher })
+
+    expect(result.status?.registrations).toHaveLength(2)
+    expect(result.status?.registrations[1]).toMatchObject({
+      dustAddress: "mn_dust1second",
+      utxoOutputIndex: "1",
+    })
+  })
+
+  test("verifies reverse-lookup candidates against their active DUST mappings", async () => {
+    vi.stubEnv("MIDNIGHT_BLOCKFROST_PROJECT_ID", "secret-project-token")
+    const otherStakeAddress =
+      "stake1u9mockotherstakeaddress0000000000000000000000"
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        data: {
+          dustGenerations: [
+            {
+              cardanoRewardAddress: stakeAddress,
+              registrations: [
+                {
+                  dustAddress: "mn_dust1target",
+                  valid: true,
+                  nightBalance: "10",
+                  generationRate: "1",
+                  maxCapacity: "50",
+                  currentCapacity: "20",
+                  utxoTxHash: "target-tx",
+                  utxoOutputIndex: 0,
+                },
+              ],
+            },
+            {
+              cardanoRewardAddress: otherStakeAddress,
+              registrations: [],
+            },
+          ],
+        },
+      }),
+    )
+
+    const result = await findStakeAddressesForDustAddress(
+      [stakeAddress, otherStakeAddress],
+      "mn_dust1target",
+      { fetcher },
+    )
+
+    expect(result).toEqual({ matches: [stakeAddress], complete: true })
   })
 })
