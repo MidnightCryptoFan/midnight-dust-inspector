@@ -23,6 +23,7 @@ const inactiveStatus: DustGenerationStatus = {
   currentCapacity: "0",
   utxoTxHash: null,
   utxoOutputIndex: null,
+  registrations: [],
   raw: {},
   source: "midnight-indexer",
   checkedAt: "2026-06-07T00:00:00.000Z",
@@ -123,11 +124,22 @@ describe("CardanoInspectionPanel active source lookup", () => {
         activeRegistrationLookup={{
           status: "found",
           stakeAddress: sourceStakeAddress,
+          candidateStakeAddresses: [sourceStakeAddress],
+          confidence: "indexer_verified",
           paymentKeyHash:
             "f9e4b726d2aa13b3b3c4ea3dc964382bc0aea1d65600d4dac0e0538a",
           txHash:
             "5dce41e2b8d5f4fd750e71f74ac2a27398031b7ab46fd2060239d1bee8b398b0",
           outputIndex: 0,
+          registrationUtxos: [
+            {
+              txHash:
+                "5dce41e2b8d5f4fd750e71f74ac2a27398031b7ab46fd2060239d1bee8b398b0",
+              outputIndex: 0,
+              paymentKeyHash:
+                "f9e4b726d2aa13b3b3c4ea3dc964382bc0aea1d65600d4dac0e0538a",
+            },
+          ],
         }}
         dustGrowthStatus="growing"
         dustCapFull={false}
@@ -156,6 +168,121 @@ describe("CardanoInspectionPanel active source lookup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Inspect source" }))
     expect(onInspectActiveSource).toHaveBeenCalledWith(sourceStakeAddress)
+  })
+
+  test("shows every structured Midnight mapping when registrations conflict", () => {
+    render(
+      <CardanoInspectionPanel
+        activeRegistrationLookup={{ status: "idle" }}
+        dustGrowthStatus="stable"
+        dustCapFull={false}
+        multipleRegistrations
+        indexerStatus={{
+          ...inactiveStatus,
+          registrations: [
+            {
+              dustAddress: "mn_dust1first",
+              valid: false,
+              nightBalance: "10",
+              generationRate: "0",
+              maxCapacity: "50",
+              currentCapacity: "50",
+              utxoTxHash: "first-registration",
+              utxoOutputIndex: "0",
+            },
+            {
+              dustAddress: "mn_dust1second",
+              valid: false,
+              nightBalance: "20",
+              generationRate: "0",
+              maxCapacity: "100",
+              currentCapacity: "100",
+              utxoTxHash: "second-registration",
+              utxoOutputIndex: "1",
+            },
+          ],
+        }}
+        isOnChainLoading={false}
+        midnightAddress="mn_dust1second"
+        onChainState={null}
+        onDeregister={vi.fn()}
+        onFindActiveSource={vi.fn()}
+        onInspectActiveSource={vi.fn()}
+        onRefresh={vi.fn()}
+        onRegister={vi.fn()}
+        recentActivity={null}
+        snapshot={null}
+        timeline={null}
+        timelineError={null}
+        walletConnected
+      />,
+    )
+
+    expect(
+      screen.getByText("2 active Cardano → Midnight mappings found"),
+    ).toBeTruthy()
+    expect(screen.getByText("mn_dust1first")).toBeTruthy()
+    expect(screen.getByText("mn_dust1second")).toBeTruthy()
+    expect(screen.getByText("✓ Connected Midnight wallet")).toBeTruthy()
+  })
+
+  test("shows ambiguous Cardano candidates without auto-selecting one", () => {
+    const onInspectActiveSource = vi.fn()
+    const firstCandidate = "stake1u9mockfirstcandidate000000000000000000000000"
+    const secondCandidate = "stake1u9mocksecondcandidate00000000000000000000000"
+
+    render(
+      <CardanoInspectionPanel
+        activeRegistrationLookup={{
+          status: "found",
+          stakeAddress: null,
+          candidateStakeAddresses: [firstCandidate, secondCandidate],
+          confidence: "ambiguous",
+          paymentKeyHash:
+            "f9e4b726d2aa13b3b3c4ea3dc964382bc0aea1d65600d4dac0e0538a",
+          txHash:
+            "5dce41e2b8d5f4fd750e71f74ac2a27398031b7ab46fd2060239d1bee8b398b0",
+          outputIndex: 0,
+          registrationUtxos: [
+            {
+              txHash:
+                "5dce41e2b8d5f4fd750e71f74ac2a27398031b7ab46fd2060239d1bee8b398b0",
+              outputIndex: 0,
+              paymentKeyHash:
+                "f9e4b726d2aa13b3b3c4ea3dc964382bc0aea1d65600d4dac0e0538a",
+            },
+          ],
+        }}
+        dustGrowthStatus="growing"
+        dustCapFull={false}
+        multipleRegistrations={false}
+        indexerStatus={inactiveStatus}
+        isOnChainLoading={false}
+        midnightAddress="mn_dust1mockdustaddress000000000000000000000000"
+        onChainState={null}
+        onDeregister={vi.fn()}
+        onFindActiveSource={vi.fn()}
+        onInspectActiveSource={onInspectActiveSource}
+        onRefresh={vi.fn()}
+        onRegister={vi.fn()}
+        recentActivity={null}
+        snapshot={null}
+        timeline={null}
+        timelineError={null}
+        walletConnected
+      />,
+    )
+
+    expect(
+      screen.getByText(
+        "Active registration found; Cardano source needs confirmation.",
+      ),
+    ).toBeTruthy()
+    const candidateButtons = screen.getAllByRole("button", {
+      name: "Inspect candidate",
+    })
+    fireEvent.click(candidateButtons[1])
+    expect(onInspectActiveSource).toHaveBeenCalledWith(secondCandidate)
   })
 
   test("explains that a full DUST balance does not reveal its Cardano source", () => {

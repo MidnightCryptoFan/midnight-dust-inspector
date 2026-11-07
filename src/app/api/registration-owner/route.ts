@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { KoiosCardanoChainProvider } from "@/services/cardano/KoiosCardanoChainProvider"
 import { tryDecodeAnyBech32 } from "@/lib/bech32"
+import { findStakeAddressesForDustAddress } from "@/services/midnightIndexerClient"
 
 // The paginated script scan can take well over a minute when Koios is slow;
 // without this the serverless function is killed at the platform default.
@@ -14,9 +15,20 @@ export type RegistrationOwnerResult =
   | {
       found: true
       stakeAddress: string | null
+      candidateStakeAddresses: string[]
+      confidence:
+        | "indexer_verified"
+        | "credential_match"
+        | "ambiguous"
+        | "unresolved"
       paymentKeyHash: string | null
       txHash: string
       outputIndex: number
+      registrationUtxos: Array<{
+        txHash: string
+        outputIndex: number
+        paymentKeyHash: string
+      }>
     }
   | { found: false; reason: string }
 
@@ -61,12 +73,43 @@ export async function POST(request: Request): Promise<Response> {
       } satisfies RegistrationOwnerResult)
     }
 
+    const indexerMatch = await findStakeAddressesForDustAddress(
+      result.candidateStakeAddresses,
+      parsed.data.dustAddress,
+    )
+    const candidateStakeAddresses = Array.from(
+      new Map(
+        [...result.candidateStakeAddresses, ...indexerMatch.matches].map(
+          (address) => [address.toLowerCase(), address],
+        ),
+      ).values(),
+    )
+
+    const hasAmbiguousIndexerMatches = indexerMatch.matches.length > 1
+    const indexerVerifiedStakeAddress =
+      indexerMatch.matches.length === 1 ? indexerMatch.matches[0] : null
+    const stakeAddress = hasAmbiguousIndexerMatches
+      ? null
+      : (indexerVerifiedStakeAddress ?? result.stakeAddress)
+    const confidence = hasAmbiguousIndexerMatches
+      ? "ambiguous"
+      : indexerVerifiedStakeAddress
+        ? "indexer_verified"
+        : result.stakeAddress
+          ? "credential_match"
+          : candidateStakeAddresses.length > 0
+            ? "ambiguous"
+            : "unresolved"
+
     return Response.json({
       found: true,
-      stakeAddress: result.stakeAddress,
+      stakeAddress,
+      candidateStakeAddresses,
+      confidence,
       paymentKeyHash: result.paymentKeyHash,
       txHash: result.txHash,
       outputIndex: result.outputIndex,
+      registrationUtxos: result.registrationUtxos,
     } satisfies RegistrationOwnerResult)
   } catch (error) {
     return Response.json({

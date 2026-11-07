@@ -682,35 +682,71 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
     outputIndex: number
     paymentKeyHash: string | null
     stakeAddress: string | null
+    candidateStakeAddresses: string[]
+    registrationUtxos: Array<{
+      txHash: string
+      outputIndex: number
+      paymentKeyHash: string
+    }>
   } | null> {
     const scriptUtxos = await this.getScriptRegistrationUtxos()
     const lowerDustHex = dustAddressHex.toLowerCase()
 
-    const match = scriptUtxos.find(
+    const matches = scriptUtxos.filter(
       (utxo) => utxo.dustAddressHex === lowerDustHex,
     )
 
-    if (!match) {
+    if (matches.length === 0) {
       return null
     }
 
-    const stakeAddress = await this.resolveStakeAddressFromTx(
-      match.txHash,
-      match.cWalletKeyHash,
+    const ownerResolutions = await Promise.all(
+      matches.map((match) =>
+        this.resolveStakeAddressFromTx(match.txHash, match.cWalletKeyHash),
+      ),
     )
+    const candidateStakeAddresses = new Map<string, string>()
+    const credentialMatchedStakeAddresses = new Map<string, string>()
+
+    for (const resolution of ownerResolutions) {
+      for (const address of resolution.candidateStakeAddresses) {
+        candidateStakeAddresses.set(address.toLowerCase(), address)
+      }
+      for (const address of resolution.credentialMatchedStakeAddresses) {
+        credentialMatchedStakeAddresses.set(address.toLowerCase(), address)
+      }
+    }
+
+    const firstMatch = matches[0]
 
     return {
-      txHash: match.txHash,
-      outputIndex: match.outputIndex,
-      paymentKeyHash: match.cWalletKeyHash,
-      stakeAddress,
+      txHash: firstMatch.txHash,
+      outputIndex: firstMatch.outputIndex,
+      paymentKeyHash:
+        new Set(matches.map((match) => match.cWalletKeyHash)).size === 1
+          ? firstMatch.cWalletKeyHash
+          : null,
+      stakeAddress:
+        credentialMatchedStakeAddresses.size === 1
+          ? Array.from(credentialMatchedStakeAddresses.values())[0]
+          : null,
+      candidateStakeAddresses: Array.from(candidateStakeAddresses.values()),
+      registrationUtxos: matches.map((match) => ({
+        txHash: match.txHash,
+        outputIndex: match.outputIndex,
+        paymentKeyHash: match.cWalletKeyHash,
+      })),
     }
   }
 
   private async resolveStakeAddressFromTx(
     txHash: string,
     paymentKeyHash: string,
-  ): Promise<string | null> {
+  ): Promise<{
+    stakeAddress: string | null
+    candidateStakeAddresses: string[]
+    credentialMatchedStakeAddresses: string[]
+  }> {
     const response = await this.fetcher(`${this.baseUrl}/tx_info`, {
       method: "POST",
       headers: {
@@ -723,36 +759,67 @@ export class KoiosCardanoChainProvider implements CardanoChainProvider {
 
     const raw = await readJsonResponse(response)
     if (!response.ok) {
-      return null
+      return {
+        stakeAddress: null,
+        candidateStakeAddresses: [],
+        credentialMatchedStakeAddresses: [],
+      }
     }
 
     let parsed: z.infer<typeof koiosTxInfoWithInputsResponseSchema>
     try {
       parsed = koiosTxInfoWithInputsResponseSchema.parse(raw)
     } catch {
-      return null
+      return {
+        stakeAddress: null,
+        candidateStakeAddresses: [],
+        credentialMatchedStakeAddresses: [],
+      }
     }
 
     const tx = parsed.find((t) => t.tx_hash === txHash)
-    if (!tx) return null
+    if (!tx) {
+      return {
+        stakeAddress: null,
+        candidateStakeAddresses: [],
+        credentialMatchedStakeAddresses: [],
+      }
+    }
 
     const lowerKey = paymentKeyHash.toLowerCase()
+    const candidateStakeAddresses = new Map<string, string>()
+    const credentialMatches = new Map<string, string>()
+
+    const addCandidate = (
+      stakeAddress: string | null | undefined,
+      matchesCredential: boolean,
+    ) => {
+      if (!stakeAddress) return
+      const key = stakeAddress.toLowerCase()
+      candidateStakeAddresses.set(key, stakeAddress)
+      if (matchesCredential) {
+        credentialMatches.set(key, stakeAddress)
+      }
+    }
 
     for (const input of tx.inputs) {
       const cred = input.payment_addr?.cred?.toLowerCase()
-      if (cred === lowerKey && input.stake_addr) {
-        return input.stake_addr
-      }
+      addCandidate(input.stake_addr, cred === lowerKey)
     }
 
-    // Fallback: return any stake_addr from any input (best guess)
-    for (const input of tx.inputs) {
-      if (input.stake_addr) {
-        return input.stake_addr
-      }
+    for (const output of tx.outputs) {
+      const cred = paymentKeyHashFromBech32Address(output.payment_addr.bech32)
+      addCandidate(output.stake_addr, cred?.toLowerCase() === lowerKey)
     }
 
-    return null
+    return {
+      stakeAddress:
+        credentialMatches.size === 1
+          ? Array.from(credentialMatches.values())[0]
+          : null,
+      candidateStakeAddresses: Array.from(candidateStakeAddresses.values()),
+      credentialMatchedStakeAddresses: Array.from(credentialMatches.values()),
+    }
   }
 
   async getUtxosForAddresses(addresses: string[]): Promise<CardanoUtxo[]> {

@@ -1,3 +1,14 @@
+export type DustRegistrationStatus = {
+  dustAddress: string
+  valid: boolean
+  nightBalance: string | null
+  generationRate: string | null
+  maxCapacity: string | null
+  currentCapacity: string | null
+  utxoTxHash: string | null
+  utxoOutputIndex: string | null
+}
+
 export type DustGenerationStatus = {
   stakeAddress: string
   registered: boolean | null
@@ -8,6 +19,7 @@ export type DustGenerationStatus = {
   currentCapacity: string | null
   utxoTxHash: string | null
   utxoOutputIndex: string | null
+  registrations: DustRegistrationStatus[]
   raw: unknown
   source: "midnight-indexer"
   checkedAt: string
