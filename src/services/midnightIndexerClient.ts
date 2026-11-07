@@ -264,18 +264,30 @@ function resolveIndexerConfiguration(): IndexerConfiguration {
   const projectId = process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID?.trim()
 
   if (configuredUrl && !isRetiredIndexerUrl(configuredUrl)) {
+    if (isBlockfrostUrl(configuredUrl) && !projectId) {
+      return {
+        ok: false,
+        message: "MIDNIGHT_BLOCKFROST_PROJECT_ID is not configured.",
+        technicalDetails: [
+          "The configured Blockfrost endpoint requires a Midnight Mainnet project token.",
+        ],
+      }
+    }
+
     return {
       ok: true,
-      url: configuredUrl,
-      headers: projectId ? { project_id: projectId } : {},
+      url: projectId
+        ? appendBlockfrostProjectId(configuredUrl, projectId)
+        : configuredUrl,
+      headers: {},
     }
   }
 
   if (projectId) {
     return {
       ok: true,
-      url: DEFAULT_BLOCKFROST_INDEXER_URL,
-      headers: { project_id: projectId },
+      url: appendBlockfrostProjectId(DEFAULT_BLOCKFROST_INDEXER_URL, projectId),
+      headers: {},
     }
   }
 
@@ -299,6 +311,20 @@ function isRetiredIndexerUrl(value: string): boolean {
   } catch {
     return false
   }
+}
+
+function isBlockfrostUrl(value: string): boolean {
+  try {
+    return new URL(value).hostname.endsWith(".blockfrost.io")
+  } catch {
+    return false
+  }
+}
+
+function appendBlockfrostProjectId(value: string, projectId: string): string {
+  const url = new URL(value)
+  url.searchParams.set("project_id", projectId)
+  return url.toString()
 }
 
 async function readResponseBody(response: Response): Promise<unknown> {

@@ -21,10 +21,10 @@ describe("Midnight indexer configuration", () => {
 
     expect(result.controlledError).toBeNull()
     expect(fetcher).toHaveBeenCalledWith(
-      "https://midnight-mainnet.blockfrost.io/api/v0",
+      "https://midnight-mainnet.blockfrost.io/api/v0?project_id=secret-project-token",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          project_id: "secret-project-token",
+        headers: expect.not.objectContaining({
+          project_id: expect.anything(),
         }),
       }),
     )
@@ -55,7 +55,7 @@ describe("Midnight indexer configuration", () => {
     await inspectDustGenerationStatus(stakeAddress, { fetcher })
 
     expect(fetcher).toHaveBeenCalledWith(
-      "https://midnight-mainnet.blockfrost.io/api/v0",
+      "https://midnight-mainnet.blockfrost.io/api/v0?project_id=secret-project-token",
       expect.any(Object),
     )
   })

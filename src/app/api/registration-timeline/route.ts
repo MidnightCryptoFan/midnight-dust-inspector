@@ -1,6 +1,10 @@
 import { z } from "zod"
 import { stakeAddressSchema } from "@/lib/validation"
 import { inspectRegistrationTimeline } from "@/services/registrationTimelineClient"
+import { KoiosCardanoChainProvider } from "@/services/cardano/KoiosCardanoChainProvider"
+import { serverKoiosFetch } from "@/services/cardano/koiosServerTransport"
+
+export const maxDuration = 120
 
 const requestSchema = z.object({
   stakeAddress: stakeAddressSchema,
@@ -60,6 +64,7 @@ export async function POST(request: Request) {
     parsedBody.data.stakeAddress,
     {
       checkedAt,
+      provider: new KoiosCardanoChainProvider({ fetcher: serverKoiosFetch }),
     },
   )
 

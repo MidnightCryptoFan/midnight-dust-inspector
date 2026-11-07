@@ -20,7 +20,7 @@ You enter a Cardano stake address (or connect your wallet) and the inspector sho
 | [Node.js](https://nodejs.org) 22 | Download the LTS version from nodejs.org                                                                |
 | A browser                        | Chrome, Firefox, Brave, or Edge                                                                         |
 | A Cardano wallet extension       | Optional — needed only to register/deregister. Works with Lace, Eternl, Nami, and other CIP-30 wallets. |
-| A Midnight wallet extension      | Optional — needed only to read your live DUST balance and address.                                      |
+| A Midnight wallet extension      | Optional — needed only to read your live DUST balance and address. Keep it updated for Ledger 9.        |
 
 ---
 
@@ -51,7 +51,7 @@ This downloads all required packages into a local `node_modules` folder. Nothing
 cp .env.example .env.local
 ```
 
-The default values in `.env.example` already point to the public Midnight mainnet endpoints. You do not need to change anything for normal use.
+The defaults point to Midnight mainnet, but live indexer reads require a free Blockfrost Midnight project token. Add it to `.env.local` as described under Configuration.
 
 **4. Start the app**
 
@@ -122,6 +122,18 @@ CARDANO_NIGHT_ASSET_NAME=4e49474854
 
 Create one free Midnight project in Blockfrost and put its token in `.env.local`. Do not prefix the variable with `NEXT_PUBLIC_`; that would expose the token to browsers. You only need to change the endpoint variables if you run your own indexer or a private Cardano data provider.
 
+### Ledger 9 compatibility
+
+Midnight Mainnet moved to Ledger 9 on 6 November 2026. The inspector is compatible with that upgrade:
+
+- It uses the current Blockfrost Mainnet indexer endpoint. Blockfrost must run Midnight Indexer 4.4.101 or newer; older indexers report DUST capacity incorrectly after the upgrade.
+- Existing Mainnet DUST registrations were replayed automatically to their full cap at the same DUST address. Users should not register again merely because of the upgrade.
+- Midnight wallet extensions must use Wallet SDK 2.0.0 or newer to show the post-upgrade DUST balance correctly. Update the extension if its balance differs from the indexer.
+- The inspector does not build or submit Midnight transactions, so it does not bundle Midnight.js or the Wallet SDK. Registration transactions are Cardano transactions and remain reviewed and signed by the Cardano wallet.
+- Preview was reset as a new Ledger 9 chain, but this inspector intentionally accepts Mainnet addresses only.
+
+See the official [Ledger 9 upgrade notes](https://docs.midnight.network/relnotes/ledger-9) and [current network endpoints](https://docs.midnight.network/relnotes/network).
+
 ---
 
 ## Stopping the app
@@ -142,7 +154,7 @@ Run `npm ci` again. This usually fixes missing packages.
 Make sure the wallet extension is installed and enabled in your browser. Some wallets need to be unlocked first.
 
 **Registration status looks wrong**
-The Midnight indexer can take up to 24 hours to reflect a recent Cardano transaction. The inspector shows you both the on-chain Cardano state and the indexer state so you can see exactly where any delay is.
+The Midnight indexer can take up to 24 hours to reflect a recent Cardano transaction. The inspector shows you both the on-chain Cardano state and the indexer state so you can see exactly where any delay is. After the Ledger 9 upgrade, also update the Midnight wallet extension; Wallet SDK 1.x cannot show the new Mainnet state correctly.
 
 ---
 
