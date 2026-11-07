@@ -10,7 +10,11 @@ import type {
   RegistrationTimeline,
   RegistrationTimelineError,
 } from "@/domain/registrationTimeline"
-import { formatCheckedAt, formatCompactAtomicQuantity } from "@/lib/formatting"
+import {
+  formatCheckedAt,
+  formatCompactAtomicQuantity,
+  formatDustRateFromIndexer,
+} from "@/lib/formatting"
 import { decodeBech32 } from "@/lib/bech32"
 import { CopyButton } from "./CopyButton"
 
@@ -199,14 +203,6 @@ export function CardanoInspectionPanel({
 
 // --- Summary tiles ---
 
-function formatIndexerRate(rate: string | null): string {
-  if (!rate) return "—"
-  if (rate === "pending") return "Pending"
-  const num = parseFloat(rate)
-  if (!isFinite(num) || num === 0) return "0 DUST/h"
-  return `${num.toLocaleString("en-US", { maximumFractionDigits: 4 })} DUST/h`
-}
-
 function SummaryTiles({
   nightSummary,
   effectiveState,
@@ -241,14 +237,14 @@ function SummaryTiles({
       )}
       <MetricTile
         label="DUST Rate"
-        value={formatIndexerRate(generationRate)}
+        value={formatDustRateFromIndexer(generationRate)}
         sub="per indexer"
         valueColor={
           generationRate && parseFloat(generationRate) > 0
             ? "text-violet-700 dark:text-violet-300"
             : "text-slate-500 dark:text-slate-400"
         }
-        tooltip="DUST Generation rate as reported by the Midnight indexer. Based on your unlocked NIGHT balance."
+        tooltip="DUST generation rate reported by the Midnight indexer in SPECK per second and converted here to DUST per hour. Based on your unlocked NIGHT balance."
       />
       <RegistrationTile effectiveState={effectiveState} />
     </div>
@@ -633,9 +629,7 @@ function NotRegisteredActions({
 
       {dustCapFull && !dustIsGrowing && !dustIsChecking && (
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
-          <p className="font-semibold">
-            DUST wallet is at its reported cap.
-          </p>
+          <p className="font-semibold">DUST wallet is at its reported cap.</p>
           <p className="mt-1 text-xs">
             Your Midnight wallet already holds the maximum DUST for its current
             NIGHT backing. This does not confirm that the Cardano stake address
@@ -756,8 +750,8 @@ function ActiveSourceLookupResult({
         </p>
         <p className="mt-2 text-xs">
           Do not register again based only on the DUST balance. Check that the
-          Cardano scan completed successfully and review the latest
-          registration transactions first.
+          Cardano scan completed successfully and review the latest registration
+          transactions first.
         </p>
         {recentActivity?.blockTime ? (
           <p className="mt-2 text-xs">

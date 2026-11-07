@@ -175,6 +175,9 @@ describe("diagnoseDustStatus", () => {
 
     expect(diagnosis.code).toBe("ZERO_CURRENT_CAPACITY")
     expect(diagnosis.severity).toBe("info")
+    expect(diagnosis.explanation).toContain(
+      "Spending DUST does not reduce this value",
+    )
   })
 
   test("classifies an indexer failure", () => {

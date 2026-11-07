@@ -44,6 +44,37 @@ afterEach(() => {
 })
 
 describe("CardanoInspectionPanel active source lookup", () => {
+  test("converts the indexer rate from SPECK per second to DUST per hour", () => {
+    render(
+      <CardanoInspectionPanel
+        activeRegistrationLookup={{ status: "idle" }}
+        dustGrowthStatus="stable"
+        dustCapFull={false}
+        multipleRegistrations={false}
+        indexerStatus={{
+          ...activeStatus,
+          dustAddress: "mn_dust1mockdustaddress000000000000000000000000",
+          generationRate: "5576091500000",
+        }}
+        isOnChainLoading={false}
+        midnightAddress={null}
+        onChainState={{ kind: "registered_active" }}
+        onDeregister={vi.fn()}
+        onFindActiveSource={vi.fn()}
+        onInspectActiveSource={vi.fn()}
+        onRefresh={vi.fn()}
+        onRegister={vi.fn()}
+        recentActivity={null}
+        snapshot={null}
+        timeline={null}
+        timelineError={null}
+        walletConnected={false}
+      />,
+    )
+
+    expect(screen.getByText("20.0739 DUST/h")).toBeTruthy()
+  })
+
   test("offers reverse lookup when the DUST cap is full but the inspected stake is inactive", () => {
     const onFindActiveSource = vi.fn()
 

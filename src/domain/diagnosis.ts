@@ -245,13 +245,13 @@ export function diagnoseDustStatus(
     return {
       code: "ZERO_CURRENT_CAPACITY",
       severity: "info",
-      title: "Current DUST capacity is zero",
+      title: "Indexer DUST capacity is zero",
       summary:
-        "The registration exists, but there is currently no available DUST capacity.",
+        "The registration exists, but the indexer estimates that no DUST capacity has accumulated yet.",
       explanation:
-        "This may be normal if DUST was recently spent or if capacity has not accumulated yet.",
+        "The indexer capacity is an estimate derived from the registered NIGHT backing. Spending DUST does not reduce this value, and it is not the connected wallet's spendable DUST balance.",
       recommendedAction:
-        "Wait and check again later. If the value never changes, export a debug report.",
+        "Connect the Midnight wallet to read its current DUST balance. If the indexer capacity remains zero despite a positive generation rate, wait and check again or export a debug report.",
       technicalDetails: buildStatusTechnicalDetails(status),
     }
   }
