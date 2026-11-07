@@ -9,9 +9,9 @@ export const stakeAddressSchema = z
   .string()
   .trim()
   .min(1, "Paste your Cardano stake address before checking.")
-  .refine((value) => parseStakeAddress(value) !== null, {
+  .refine((value) => parseStakeAddress(value)?.network === "mainnet", {
     message:
-      "This does not look like a valid Cardano stake address. Stake addresses usually start with stake1 or stake_test1.",
+      "Enter a valid Cardano mainnet stake address starting with stake1.",
   })
   .transform((value) => value.toLowerCase())
 
@@ -37,19 +37,29 @@ export function validateStakeAddress(input: string): AddressValidationResult {
       }
     }
 
-    return parsed.network === "testnet"
-      ? {
-          valid: true,
-          address: parsed.address,
-          note: "This is a testnet stake address. The default Midnight DUST Inspector endpoints are configured for mainnet.",
-        }
-      : { valid: true, address: parsed.address }
+    if (parsed.network === "testnet") {
+      return {
+        valid: false,
+        message:
+          "This tool is configured for Midnight mainnet. Switch to a Cardano mainnet wallet or enter a stake1 address.",
+      }
+    }
+
+    return { valid: true, address: parsed.address }
   }
 
   // If the user pasted a full Cardano base address, try to extract the stake key.
   if (lower.startsWith("addr")) {
     const extracted = extractStakeAddressFromCardanoAddress(trimmed)
     if (extracted) {
+      if (parseStakeAddress(extracted)?.network !== "mainnet") {
+        return {
+          valid: false,
+          message:
+            "This tool is configured for Midnight mainnet. Switch to a Cardano mainnet wallet or enter a mainnet address.",
+        }
+      }
+
       return {
         valid: true,
         address: extracted,
@@ -66,7 +76,7 @@ export function validateStakeAddress(input: string): AddressValidationResult {
   return {
     valid: false,
     message:
-      "This does not look like a Cardano stake address. Stake addresses usually start with stake or stake_test.",
+      "This does not look like a Cardano mainnet stake address. Stake addresses start with stake1.",
   }
 }
 

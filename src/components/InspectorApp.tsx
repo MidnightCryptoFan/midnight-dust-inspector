@@ -144,8 +144,8 @@ export function InspectorApp() {
       if (Date.now() - state.startedAt >= 8_000) {
         const delta =
           current > state.initialBalance ? current - state.initialBalance : 0n
-        // 10s window → multiply by 360 to get per-hour rate
-        const ratePerHour = delta * 360n
+        const elapsedMilliseconds = Math.max(1, Date.now() - state.startedAt)
+        const ratePerHour = (delta * 3_600_000n) / BigInt(elapsedMilliseconds)
         setDustRate(ratePerHour > 0n ? ratePerHour : null)
         setDustGrowthStatus(
           current > state.initialBalance ? "growing" : "stable",
@@ -155,7 +155,7 @@ export function InspectorApp() {
       return
     }
 
-    // First reading for a new (or switched) wallet — start the 10-second check.
+    // First reading for a new (or switched) wallet — start a short check.
     dustGrowthCheckRef.current = {
       walletId,
       phase: "checking",

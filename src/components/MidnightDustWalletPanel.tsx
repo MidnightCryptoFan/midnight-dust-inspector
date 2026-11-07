@@ -26,7 +26,7 @@ type MidnightDustWalletPanelProps = {
   error: MidnightWalletError | null
   generationNotice?: string | null
   dustGrowthStatus?: DustGrowthStatus
-  /** Atomic DUST units per hour, computed from 10-second measurement. */
+  /** Atomic DUST units per hour, estimated from two wallet balance reads. */
   dustRate?: bigint | null
   onBalanceChange: (
     balance: MidnightDustBalance | null,
@@ -210,10 +210,10 @@ export function MidnightDustWalletPanel({
               tooltip="Maximum DUST your wallet can hold. Calculated as 5× your unlocked NIGHT balance. Generation pauses when the cap is reached."
             />
             <DustMetric
-              label="Generation rate"
+              label="Estimated rate"
               value={formatDustRate(dustGrowthStatus, dustRate)}
               measuring={dustGrowthStatus === "checking"}
-              tooltip="Speed at which your wallet is currently accumulating DUST, measured over a short window."
+              tooltip="Estimate from the wallet balance change over a short interval. The Midnight wallet API exposes balance and cap, but no direct generation-rate field."
             />
           </div>
 
@@ -249,10 +249,12 @@ export function MidnightDustWalletPanel({
       ) : (
         <>
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-            Connect to read your Midnight DUST wallet address, DUST balance, and DUST cap.
+            Connect to read your Midnight DUST wallet address, DUST balance, and
+            DUST cap.
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            Your NIGHT remains in your Cardano wallet. DUST is generated for usage on Midnight and is not transferred from your wallet.
+            Your NIGHT remains in your Cardano wallet. DUST is generated for
+            usage on Midnight and is not transferred from your wallet.
           </p>
           {wallets.length > 0 ? (
             <div className="space-y-2">
@@ -479,7 +481,7 @@ function GenerationEta({
     return (
       <p className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-violet-500" />
-        Measuring generation rate over 10 seconds…
+        Estimating generation rate from two wallet balance readings…
       </p>
     )
   }
@@ -514,7 +516,7 @@ function GenerationEta({
     <div className="flex flex-wrap items-center gap-3 text-xs">
       <span className="flex items-center gap-1.5 font-medium text-green-700 dark:text-green-400">
         <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-        Active — DUST growing
+        Balance increased — DUST appears to be growing
       </span>
       {etaText && (
         <span className="text-slate-500 dark:text-slate-400">{etaText}</span>

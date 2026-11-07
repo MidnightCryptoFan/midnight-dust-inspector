@@ -84,6 +84,52 @@ export function formatCompactAtomicQuantity(
   return `${sign}${roundedWhole}`
 }
 
+export const SPECKS_PER_DUST = 1_000_000_000_000_000n
+
+export function indexerRateToSpecksPerHour(
+  specksPerSecond: string | null | undefined,
+): bigint | null {
+  if (!specksPerSecond || !/^[+-]?\d+$/.test(specksPerSecond.trim())) {
+    return null
+  }
+
+  return BigInt(specksPerSecond.trim()) * 3_600n
+}
+
+export function formatDustRateFromIndexer(
+  specksPerSecond: string | null | undefined,
+): string {
+  if (specksPerSecond === "pending") {
+    return "Pending"
+  }
+
+  const specksPerHour = indexerRateToSpecksPerHour(specksPerSecond)
+
+  if (specksPerHour == null) {
+    return "—"
+  }
+
+  return `${formatAtomicDecimal(specksPerHour, SPECKS_PER_DUST, 4)} DUST/h`
+}
+
+function formatAtomicDecimal(
+  atomicValue: bigint,
+  atomicUnitsPerUnit: bigint,
+  maximumFractionDigits: number,
+): string {
+  const scale = 10n ** BigInt(maximumFractionDigits)
+  const sign = atomicValue < 0n ? "-" : ""
+  const absoluteValue = atomicValue < 0n ? -atomicValue : atomicValue
+  const scaledValue = roundDiv(absoluteValue * scale, atomicUnitsPerUnit)
+  const whole = scaledValue / scale
+  const fraction = (scaledValue % scale)
+    .toString()
+    .padStart(maximumFractionDigits, "0")
+    .replace(/0+$/, "")
+
+  return `${sign}${whole}${fraction ? `.${fraction}` : ""}`
+}
+
 function roundDiv(numerator: bigint, denominator: bigint): bigint {
   return (numerator + denominator / 2n) / denominator
 }
