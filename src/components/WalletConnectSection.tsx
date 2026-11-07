@@ -152,7 +152,8 @@ export function WalletConnectSection({
         registrations without any third-party app.
       </p>
       <p className="text-xs text-slate-400 dark:text-slate-500">
-        You can inspect your status read-only. Registration actions require explicit wallet confirmation.
+        You can inspect your status read-only. Registration actions require
+        explicit wallet confirmation.
       </p>
 
       {wallets.length > 0 ? (
