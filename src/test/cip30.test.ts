@@ -28,6 +28,7 @@ describe("CIP-30 wallet service", () => {
         isEnabled: async () => false,
         enable: async () =>
           ({
+            getNetworkId: async () => 1,
             getRewardAddresses: async () => [],
             getChangeAddress: async () => makeBaseAddressHex(),
             getUsedAddresses: async () => [],
@@ -54,6 +55,7 @@ describe("CIP-30 wallet service", () => {
         isEnabled: async () => false,
         enable: async () =>
           ({
+            getNetworkId: async () => 1,
             getRewardAddresses: async () => [],
             getChangeAddress: async () => makeBaseAddressHex(0x33),
             getUsedAddresses: async () => [
@@ -76,6 +78,29 @@ describe("CIP-30 wallet service", () => {
       "44".repeat(28),
     ])
     expect(wallet.paymentKeyHash).toBe("33".repeat(28))
+  })
+
+  test("rejects a Cardano wallet connected to testnet", async () => {
+    window.cardano = {
+      lace: {
+        name: "Lace",
+        icon: "",
+        apiVersion: "1.0.0",
+        isEnabled: async () => false,
+        enable: async () =>
+          ({
+            getNetworkId: async () => 0,
+            getRewardAddresses: async () => [],
+            getChangeAddress: async () => makeBaseAddressHex(),
+            getUsedAddresses: async () => [],
+            getUnusedAddresses: async () => [],
+          }) as never,
+      },
+    }
+
+    await expect(connectWallet("lace")).rejects.toThrow(
+      "Switch the Cardano wallet to mainnet",
+    )
   })
 })
 
