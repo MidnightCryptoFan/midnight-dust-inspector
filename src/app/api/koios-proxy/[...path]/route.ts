@@ -13,6 +13,8 @@
  * origin.
  */
 
+import { serverKoiosFetch } from "@/services/cardano/koiosServerTransport"
+
 // Koios can take tens of seconds per request when busy; don't let the
 // platform default kill an in-flight transaction build.
 export const maxDuration = 120
@@ -100,7 +102,7 @@ async function proxy(
 
   let upstream: Response
   try {
-    upstream = await fetch(target, {
+    upstream = await serverKoiosFetch(target, {
       method,
       headers,
       body,

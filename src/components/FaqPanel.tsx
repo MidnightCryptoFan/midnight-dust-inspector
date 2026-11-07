@@ -66,7 +66,12 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: "Which wallets are supported?",
     answer:
-      "For Cardano: any CIP-30 compatible wallet extension, including Lace, Eternl, and Nami. For reading your DUST balance and address: a Midnight DApp Connector compatible wallet. Wallet connections are optional — the inspector works in read-only mode with just a stake address.",
+      "For Cardano: any CIP-30 compatible mainnet wallet extension, including Lace, Eternl, and Nami. For reading your DUST balance and address: a Midnight DApp Connector compatible wallet updated for Ledger 9 (Wallet SDK 2.0.0 or newer). Wallet connections are optional — the inspector works in read-only mode with just a stake address.",
+  },
+  {
+    question: "What changed with the Midnight Ledger 9 upgrade?",
+    answer:
+      "Midnight Mainnet moved to Ledger 9 on 6 November 2026. Existing Mainnet DUST registrations were replayed automatically to their full cap at the same DUST address, so you do not need to register again because of the upgrade. The inspector uses the new Blockfrost Mainnet indexer endpoint, which must run Indexer 4.4.101 or newer for correct DUST capacity values.\n\nIf the connected Midnight wallet shows an old or different balance, update the wallet extension: post-upgrade balances require Wallet SDK 2.0.0 or newer. Preview was reset, but this inspector is intentionally Mainnet-only.",
   },
 ]
 

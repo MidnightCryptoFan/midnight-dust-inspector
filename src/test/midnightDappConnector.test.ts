@@ -232,6 +232,60 @@ describe("Midnight DApp Connector service", () => {
     expect(result.balance?.cap).toBe("441800")
   })
 
+  test("reuses the connected API for later balance reads", async () => {
+    const getDustBalance = vi.fn(async () => ({
+      balance: 12345n,
+      cap: 441800n,
+    }))
+    const connect = vi.fn(async () => ({
+      getDustAddress: async () =>
+        "mn_dust1mockdustaddress000000000000000000000000",
+      getDustBalance,
+    }))
+    window.midnight = {
+      lace: {
+        name: "Lace",
+        icon: "",
+        apiVersion: "4.0.1",
+        connect,
+      },
+    }
+
+    await readMidnightWalletDustBalance("lace")
+    await readMidnightWalletDustBalance("lace")
+
+    expect(connect).toHaveBeenCalledOnce()
+    expect(getDustBalance).toHaveBeenCalledTimes(2)
+  })
+
+  test("keeps wallet configuration credentials out of debug data", async () => {
+    window.midnight = {
+      lace: {
+        name: "Lace",
+        icon: "",
+        apiVersion: "4.0.1",
+        connect: async () => ({
+          getDustAddress: async () =>
+            "mn_dust1mockdustaddress000000000000000000000000",
+          getDustBalance: async () => ({ balance: 0n, cap: 0n }),
+          getConfiguration: async () => ({
+            networkId: "mainnet",
+            projectId: "must-not-leak",
+            indexerUri: "https://example.test/graphql?project_id=must-not-leak",
+          }),
+        }),
+      },
+    }
+
+    const result = await readMidnightWalletDustBalance("lace")
+
+    expect(result.error).toBeNull()
+    expect(result.balance?.raw).toMatchObject({
+      configuration: { networkId: "mainnet" },
+    })
+    expect(JSON.stringify(result.balance?.raw)).not.toContain("must-not-leak")
+  })
+
   test("does not block the main balance read on optional wallet metadata", async () => {
     vi.useFakeTimers()
     window.midnight = {

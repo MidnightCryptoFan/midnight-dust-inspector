@@ -59,6 +59,11 @@ type MidnightInitialWalletApi = {
   connect?: (...args: unknown[]) => Promise<MidnightConnectedWalletApi>
 }
 
+const connectedWalletApiCache = new WeakMap<
+  MidnightInitialWalletApi,
+  Map<string, Promise<MidnightConnectedWalletApi>>
+>()
+
 declare global {
   interface Window {
     midnight?: Record<string, MidnightInitialWalletApi | undefined>
@@ -134,7 +139,11 @@ export async function readMidnightWalletDustBalance(
 
   try {
     const connected = await withTimeout(
-      connectViaMidnightWallet(wallet, connectionMode, options?.networkId),
+      connectViaMidnightWalletCached(
+        wallet,
+        connectionMode,
+        options?.networkId,
+      ),
       timeoutMs,
       "The Midnight wallet did not answer the connection request in time.",
     )
@@ -172,6 +181,8 @@ export async function readMidnightWalletDustBalance(
       readOptional(() => connected.getConfiguration?.(), optionalTimeoutMs),
     ])
 
+    assertExpectedNetwork(configuration, networkId)
+
     return {
       balance: {
         walletId: resolvedWalletId,
@@ -187,7 +198,7 @@ export async function readMidnightWalletDustBalance(
           cap: dustSnapshot.cap,
           walletState: dustSnapshot.walletState,
           connectionStatus,
-          configuration,
+          configuration: sanitizeWalletConfiguration(configuration),
           apiVersion: wallet.apiVersion ?? null,
         },
       },
@@ -216,6 +227,41 @@ export async function readMidnightWalletDustBalance(
       }),
     }
   }
+}
+
+function connectViaMidnightWalletCached(
+  wallet: MidnightInitialWalletApi,
+  connectionMode: MidnightWalletConnectionMode,
+  requestedNetworkId: string | undefined,
+): Promise<MidnightConnectedWalletApi> {
+  const networkId = getNetworkIdForConnectionMode(
+    connectionMode,
+    requestedNetworkId,
+  )
+  const cacheKey = `${connectionMode}:${networkId ?? "wallet-default"}`
+  let walletConnections = connectedWalletApiCache.get(wallet)
+
+  if (!walletConnections) {
+    walletConnections = new Map()
+    connectedWalletApiCache.set(wallet, walletConnections)
+  }
+
+  const cachedConnection = walletConnections.get(cacheKey)
+  if (cachedConnection) {
+    return cachedConnection
+  }
+
+  const connection = connectViaMidnightWallet(
+    wallet,
+    connectionMode,
+    requestedNetworkId,
+  ).catch((error: unknown) => {
+    walletConnections?.delete(cacheKey)
+    throw error
+  })
+
+  walletConnections.set(cacheKey, connection)
+  return connection
 }
 
 async function connectViaMidnightWallet(
@@ -521,6 +567,52 @@ function normalizeOptionalInteger(value: unknown): string | null {
   }
 
   return null
+}
+
+function assertExpectedNetwork(
+  configuration: unknown,
+  expectedNetworkId: string | undefined,
+): void {
+  if (!expectedNetworkId || !isRecord(configuration)) {
+    return
+  }
+
+  const reportedNetworkId =
+    typeof configuration.networkId === "string"
+      ? configuration.networkId
+      : typeof configuration.network === "string"
+        ? configuration.network
+        : null
+
+  if (
+    reportedNetworkId &&
+    reportedNetworkId.toLowerCase() !== expectedNetworkId.toLowerCase()
+  ) {
+    throw new Error(
+      `The Midnight wallet reported network "${reportedNetworkId}" instead of "${expectedNetworkId}".`,
+    )
+  }
+}
+
+function sanitizeWalletConfiguration(configuration: unknown): unknown {
+  if (!isRecord(configuration)) {
+    return configuration
+  }
+
+  const safeConfiguration: Record<string, unknown> = {}
+
+  for (const key of ["networkId", "network", "networkName"]) {
+    const value = configuration[key]
+    if (typeof value === "string" || typeof value === "number") {
+      safeConfiguration[key] = value
+    }
+  }
+
+  return safeConfiguration
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 async function readOptional(

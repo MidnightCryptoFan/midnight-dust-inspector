@@ -73,6 +73,17 @@ export async function connectWallet(
     handle.enable(),
     "The Cardano wallet did not answer the connection request in time.",
   )
+  const networkId = await withWalletTimeout(
+    api.getNetworkId(),
+    "The Cardano wallet did not report its network in time.",
+  )
+
+  if (networkId !== 1) {
+    throw new Error(
+      "This tool uses Midnight mainnet. Switch the Cardano wallet to mainnet and connect again.",
+    )
+  }
+
   const stakeAddress = await extractStakeAddress(api)
   const paymentKeyHashes = await extractPaymentKeyHashes(api)
 

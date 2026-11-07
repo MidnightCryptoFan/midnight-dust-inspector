@@ -18,7 +18,8 @@ const baseUrl =
   process.env.NEXT_PUBLIC_BASE_URL ??
   "https://midnight-dust-inspector.vercel.app"
 
-const title = "Midnight DUST Inspector – Check DUST Generation and Registration Status"
+const title =
+  "Midnight DUST Inspector – Check DUST Generation and Registration Status"
 const description =
   "Check your Midnight DUST generation status, NIGHT balance, and registration state. Non-custodial — no seed phrase or sign-up required."
 

@@ -7,6 +7,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-07
+
+### Added
+
+- Support the Ledger 9 mainnet service endpoints and expose actionable compatibility guidance when a connected wallet still targets an older network.
+- Add regression coverage for Midnight indexer configuration, generation-rate conversion, wallet network validation, and public service endpoints.
+
+### Changed
+
+- Move mainnet DUST status reads from the retired public indexer to Blockfrost's Midnight GraphQL service, authenticated server-side with `MIDNIGHT_BLOCKFROST_PROJECT_ID`.
+- Present wallet generation rates as estimates and convert the wallet API's SPECK-per-second values without inflating them by the elapsed generation period.
+- Reuse wallet sessions during inspection and require a mainnet wallet before querying or submitting mainnet data.
+- Update runtime dependencies and document the current Midnight, Blockfrost, and environment configuration.
+
+### Fixed
+
+- Prevent retired indexer responses, timeouts, and partial GraphQL failures from producing misleading registration results.
+- Correct DUST capacity, generated amount, elapsed-time, and next-update calculations for Ledger 9 semantics.
+- Keep Blockfrost credentials out of URLs, browser responses, logs, and requests to custom indexers.
+- Handle the updated Midnight wallet network identifiers and public proof-server topology.
+
+### Security
+
+- Resolve all production dependency advisories; `npm audit --omit=dev` reports zero vulnerabilities.
+
 ## [0.6.2] - 2026-09-29
 
 ### Fixed

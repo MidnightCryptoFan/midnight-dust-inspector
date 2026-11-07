@@ -22,12 +22,12 @@ describe("validateStakeAddress", () => {
     expect(result.valid).toBe(true)
   })
 
-  test("accepts a valid testnet stake address with a mainnet note", () => {
+  test("rejects a valid testnet stake address", () => {
     const result = validateStakeAddress(testnetStakeAddress)
 
-    expect(result.valid).toBe(true)
-    if (result.valid) {
-      expect(result.note).toMatch(/testnet/)
+    expect(result.valid).toBe(false)
+    if (!result.valid) {
+      expect(result.message).toMatch(/mainnet/)
     }
   })
 
