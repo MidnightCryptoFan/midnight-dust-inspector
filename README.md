@@ -6,6 +6,7 @@ You enter a Cardano stake address (or connect your wallet) and the inspector sho
 
 - Whether your NIGHT is registered for DUST generation
 - How much DUST you are generating and at what rate
+- Every active Cardano → Midnight mapping reported for the stake address, including duplicates
 - Whether the Cardano on-chain state matches what the Midnight indexer reports
 - A timeline of available registration and de-registration transactions (provider limits or errors may make it incomplete)
 
@@ -81,13 +82,15 @@ Click **Connect** in the Cardano section and choose your wallet extension. This 
 
 Click **Connect** in the Midnight section to read your DUST balance, capacity cap, and DUST address. This is read-only — the tool cannot submit Midnight transactions.
 
+When the connected Midnight wallet is generating DUST but the inspected Cardano stake address is not, use **Find active source**. The Inspector scans every live Cardano registration UTxO targeting that DUST address, matches each registration credential against transaction inputs and outputs, and verifies candidate stake addresses against Midnight's active registration data. It never selects an unrelated transaction input merely because it contains a stake address.
+
 ---
 
 ## Safety
 
 - The tool **never asks for your seed phrase or private keys**
 - Wallet data is handled in memory for the current session; the app does not persist wallet credentials
-- Stake addresses you inspect are sent to the configured Midnight Indexer and Cardano Koios endpoints so the app can read public status and on-chain history
+- Stake addresses you inspect are sent through the app's server routes to the configured Midnight Indexer and Cardano Koios endpoints so the app can read public status and on-chain history
 - The inspected stake address is reflected in the page URL as `?stake=...` for refresh/share support; the app sends a referrer policy that avoids leaking the full URL to external sites
 - Wallet signing always happens **inside your wallet extension**, not in this app
 - Inspection without a wallet is completely **read-only**
@@ -129,6 +132,8 @@ Midnight Mainnet moved to Ledger 9 on 6 November 2026. The inspector is compatib
 - It uses the current Blockfrost Mainnet indexer endpoint. Blockfrost must run Midnight Indexer 4.4.101 or newer; older indexers report DUST capacity incorrectly after the upgrade.
 - Existing Mainnet DUST registrations were replayed automatically to their full cap at the same DUST address. Users should not register again merely because of the upgrade.
 - Midnight wallet extensions must use Wallet SDK 2.0.0 or newer to show the post-upgrade DUST balance correctly. Update the extension if its balance differs from the indexer.
+- Ledger 9 and DApp Connector v4 do not expose the linked Cardano stake address directly. The connector exposes the DUST address and balance; the Inspector correlates that public DUST address with Cardano's registration mapping and verifies candidates through the indexer's `dustGenerations` query.
+- The current indexer reports every active registration, its validity, destination DUST address, and Cardano registration UTxO. The Inspector uses those structured records to detect duplicate links instead of relying on an error-message string.
 - The inspector does not build or submit Midnight transactions, so it does not bundle Midnight.js or the Wallet SDK. Registration transactions are Cardano transactions and remain reviewed and signed by the Cardano wallet.
 - Preview was reset as a new Ledger 9 chain, but this inspector intentionally accepts Mainnet addresses only.
 
@@ -155,6 +160,12 @@ Make sure the wallet extension is installed and enabled in your browser. Some wa
 
 **Registration status looks wrong**
 The Midnight indexer can take up to 24 hours to reflect a recent Cardano transaction. The inspector shows you both the on-chain Cardano state and the indexer state so you can see exactly where any delay is. After the Ledger 9 upgrade, also update the Midnight wallet extension; Wallet SDK 1.x cannot show the new Mainnet state correctly.
+
+**My Midnight wallet generates DUST, but this Cardano stake address is not registered**
+Do not register again immediately. Connect the Midnight wallet and select **Find active source**. A verified result means the candidate stake address reports the same DUST destination in Midnight's active registration data. If several candidates remain, inspect them individually; the Inspector deliberately does not guess.
+
+**Multiple Cardano → Midnight mappings are shown**
+Exactly one active registration should remain for a Cardano stake address. Connect both wallets, compare the listed DUST destinations with the connected Midnight wallet, then use **Clean up registrations**. Review every selected registration before signing the single Cardano cleanup transaction.
 
 ---
 

@@ -49,9 +49,20 @@ export type ActiveRegistrationLookup =
   | {
       status: "found"
       stakeAddress: string | null
+      candidateStakeAddresses: string[]
+      confidence:
+        | "indexer_verified"
+        | "credential_match"
+        | "ambiguous"
+        | "unresolved"
       paymentKeyHash: string | null
       txHash: string
       outputIndex: number
+      registrationUtxos: Array<{
+        txHash: string
+        outputIndex: number
+        paymentKeyHash: string
+      }>
     }
   | { status: "not_found"; reason: string }
 
@@ -306,16 +317,21 @@ export function InspectorApp() {
       if (requestId !== inspectionRequestRef.current) return
       setInspection(newInspection)
 
-      // Cross-check on-chain state when indexer says registered
-      if (result.status?.registered) {
+      // Cross-check on-chain state when the indexer reports a valid mapping or
+      // exposes active mappings that may be conflicting with each other.
+      const indexerStatus = result.status
+      if (
+        indexerStatus &&
+        (indexerStatus.registered || indexerStatus.registrations.length > 0)
+      ) {
         const paymentKeyHashes =
           options?.paymentKeyHashes ?? connectedWallet?.paymentKeyHashes ?? []
 
-        if (result.status.utxoTxHash) {
+        if (indexerStatus.utxoTxHash) {
           // Fast path: indexer has a UTxO pointer; check if still unspent.
           void fetchOnChainState(
-            result.status.utxoTxHash,
-            result.status.utxoOutputIndex,
+            indexerStatus.utxoTxHash,
+            indexerStatus.utxoOutputIndex,
             null,
             requestId,
           )
@@ -453,9 +469,12 @@ export function InspectorApp() {
         setActiveRegistrationLookup({
           status: "found",
           stakeAddress: result.stakeAddress,
+          candidateStakeAddresses: result.candidateStakeAddresses,
+          confidence: result.confidence,
           paymentKeyHash: result.paymentKeyHash,
           txHash: result.txHash,
           outputIndex: result.outputIndex,
+          registrationUtxos: result.registrationUtxos,
         })
       } else {
         setActiveRegistrationLookup({
@@ -666,6 +685,7 @@ export function InspectorApp() {
                 multipleRegistrations={
                   inspection.diagnosis.code ===
                     "MULTIPLE_REGISTRATIONS_DETECTED" ||
+                  (inspection.status?.registrations.length ?? 0) > 1 ||
                   (inspection.registrationTimeline?.activeRegistrationCount ??
                     0) > 1
                 }

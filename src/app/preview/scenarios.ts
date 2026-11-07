@@ -104,6 +104,7 @@ function indexerStatus(
     currentCapacity: null,
     utxoTxHash: null,
     utxoOutputIndex: null,
+    registrations: [],
     raw: {},
     source: "midnight-indexer",
     checkedAt: CHECKED_AT,

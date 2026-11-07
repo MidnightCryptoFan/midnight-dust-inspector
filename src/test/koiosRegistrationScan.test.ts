@@ -280,6 +280,150 @@ describe("findActiveRegistrationsForAccount", () => {
   })
 })
 
+describe("findRegistrationOwnerForDustAddress", () => {
+  const STAKE = "stake1uyz7lfltd2yle4ehzhu77wcjk8d0lmj7c90rcuyxragve6cyyhr4g"
+  const OTHER_STAKE = "stake1u9mockotherstakeaddress000000000000000000000000"
+
+  test("resolves the stake address from an output whose payment credential matches c_wallet", async () => {
+    const accountAddress = makeAccountAddress(STAKE, KEY_A)
+    const provider = new KoiosCardanoChainProvider({
+      fetcher: async (input) => {
+        const url = String(input)
+        if (url.includes("/address_utxos")) {
+          return jsonResponse([
+            {
+              tx_hash: "registration-tx",
+              tx_index: 0,
+              inline_datum: { bytes: datum(KEY_A, DUST_1) },
+            },
+          ])
+        }
+        if (url.includes("/tx_info")) {
+          return jsonResponse([
+            {
+              tx_hash: "registration-tx",
+              inputs: [
+                {
+                  payment_addr: { cred: KEY_B },
+                  stake_addr: OTHER_STAKE,
+                },
+              ],
+              outputs: [
+                {
+                  tx_index: 1,
+                  payment_addr: { bech32: accountAddress },
+                  stake_addr: STAKE,
+                },
+              ],
+            },
+          ])
+        }
+        throw new Error(`Unexpected Koios call: ${url}`)
+      },
+    })
+
+    const result = await provider.findRegistrationOwnerForDustAddress(DUST_1)
+
+    expect(result?.stakeAddress).toBe(STAKE)
+    expect(result?.candidateStakeAddresses).toEqual([OTHER_STAKE, STAKE])
+  })
+
+  test("does not guess an unrelated input when no credential matches", async () => {
+    const provider = new KoiosCardanoChainProvider({
+      fetcher: async (input) => {
+        const url = String(input)
+        if (url.includes("/address_utxos")) {
+          return jsonResponse([
+            {
+              tx_hash: "registration-tx",
+              tx_index: 0,
+              inline_datum: { bytes: datum(KEY_A, DUST_1) },
+            },
+          ])
+        }
+        if (url.includes("/tx_info")) {
+          return jsonResponse([
+            {
+              tx_hash: "registration-tx",
+              inputs: [
+                {
+                  payment_addr: { cred: KEY_B },
+                  stake_addr: OTHER_STAKE,
+                },
+              ],
+              outputs: [],
+            },
+          ])
+        }
+        throw new Error(`Unexpected Koios call: ${url}`)
+      },
+    })
+
+    const result = await provider.findRegistrationOwnerForDustAddress(DUST_1)
+
+    expect(result?.stakeAddress).toBeNull()
+    expect(result?.candidateStakeAddresses).toEqual([OTHER_STAKE])
+  })
+
+  test("collects every active registration that targets the same DUST address", async () => {
+    const secondStake = encodeBech32("stake", [
+      0xe1,
+      ...new Array<number>(28).fill(0xbb),
+    ])
+    const firstAddress = makeAccountAddress(STAKE, KEY_A)
+    const secondAddress = makeAccountAddress(secondStake, KEY_B)
+    const provider = new KoiosCardanoChainProvider({
+      fetcher: async (input, init) => {
+        const url = String(input)
+        if (url.includes("/address_utxos")) {
+          return jsonResponse([
+            {
+              tx_hash: "first-registration",
+              tx_index: 0,
+              inline_datum: { bytes: datum(KEY_A, DUST_1) },
+            },
+            {
+              tx_hash: "second-registration",
+              tx_index: 1,
+              inline_datum: { bytes: datum(KEY_B, DUST_1) },
+            },
+          ])
+        }
+        if (url.includes("/tx_info")) {
+          const body = JSON.parse(String(init?.body)) as {
+            _tx_hashes: string[]
+          }
+          const txHash = body._tx_hashes[0]
+          const isFirst = txHash === "first-registration"
+          return jsonResponse([
+            {
+              tx_hash: txHash,
+              inputs: [],
+              outputs: [
+                {
+                  tx_index: isFirst ? 0 : 1,
+                  payment_addr: {
+                    bech32: isFirst ? firstAddress : secondAddress,
+                  },
+                  stake_addr: isFirst ? STAKE : secondStake,
+                },
+              ],
+            },
+          ])
+        }
+        throw new Error(`Unexpected Koios call: ${url}`)
+      },
+    })
+
+    const result = await provider.findRegistrationOwnerForDustAddress(DUST_1)
+
+    expect(result?.stakeAddress).toBeNull()
+    expect(result?.candidateStakeAddresses).toEqual([STAKE, secondStake])
+    expect(result?.registrationUtxos).toHaveLength(2)
+    expect(result?.paymentKeyHash).toBeNull()
+  })
+})
+
 describe("getUtxosForAddresses request sizing", () => {
   test("keeps every Koios address_utxos request below the 5 KiB body cap", async () => {
     const addresses = Array.from(

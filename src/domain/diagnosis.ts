@@ -99,6 +99,7 @@ export function diagnoseDustStatus(
   },
 ): DiagnosisResult {
   if (
+    (status?.registrations.length ?? 0) > 1 ||
     containsMultipleRegistrationSignal(controlledError?.message) ||
     containsMultipleRegistrationSignal(controlledError?.raw) ||
     containsMultipleRegistrationSignal(status?.raw)
@@ -114,7 +115,9 @@ export function diagnoseDustStatus(
       recommendedAction:
         "Do not blindly submit another removal transaction. First verify which registration remains active and whether the indexer has processed the latest Cardano transaction.",
       technicalDetails: [
-        "A multiple-registration signal was found in the indexer data or error details.",
+        status && status.registrations.length > 1
+          ? `The indexer returned ${status.registrations.length} active registration mappings.`
+          : "A multiple-registration signal was found in the indexer data or error details.",
         ...buildStatusTechnicalDetails(status),
         ...buildErrorTechnicalDetails(controlledError),
       ],
@@ -306,6 +309,11 @@ function buildStatusTechnicalDetails(
     `currentCapacity: ${status.currentCapacity ?? "not reported"}`,
     `utxoTxHash: ${status.utxoTxHash ?? "not reported"}`,
     `utxoOutputIndex: ${status.utxoOutputIndex ?? "not reported"}`,
+    `activeRegistrationCount: ${status.registrations.length}`,
+    ...status.registrations.map(
+      (registration, index) =>
+        `registration[${index}]: dustAddress=${registration.dustAddress}, valid=${String(registration.valid)}, utxo=${registration.utxoTxHash ?? "not reported"}#${registration.utxoOutputIndex ?? "not reported"}`,
+    ),
     `source: ${status.source}`,
     `checkedAt: ${status.checkedAt}`,
   ]

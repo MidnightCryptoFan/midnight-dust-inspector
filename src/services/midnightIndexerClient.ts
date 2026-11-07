@@ -2,6 +2,7 @@ import { z } from "zod"
 import type {
   ControlledIndexerError,
   DustGenerationStatus,
+  DustRegistrationStatus,
   IndexerInspectionResult,
 } from "@/domain/dustStatus"
 
@@ -16,7 +17,7 @@ const RETIRED_INDEXER_HOST = "indexer.mainnet.midnight.network"
 const INDEXER_TIMEOUT_MS = 15_000
 
 const DUST_GENERATION_STATUS_QUERY = `
-query DustGenerationStatus($cardanoRewardAddresses: [CardanoRewardAddress!]!) {
+query DustGenerationInspection($cardanoRewardAddresses: [CardanoRewardAddress!]!) {
   dustGenerationStatus(cardanoRewardAddresses: $cardanoRewardAddresses) {
     cardanoRewardAddress
     registered
@@ -27,6 +28,37 @@ query DustGenerationStatus($cardanoRewardAddresses: [CardanoRewardAddress!]!) {
     currentCapacity
     utxoTxHash
     utxoOutputIndex
+  }
+  dustGenerations(cardanoRewardAddresses: $cardanoRewardAddresses) {
+    cardanoRewardAddress
+    registrations {
+      dustAddress
+      valid
+      nightBalance
+      generationRate
+      maxCapacity
+      currentCapacity
+      utxoTxHash
+      utxoOutputIndex
+    }
+  }
+}
+`
+
+const DUST_REGISTRATION_MATCH_QUERY = `
+query DustRegistrationMatch($cardanoRewardAddresses: [CardanoRewardAddress!]!) {
+  dustGenerations(cardanoRewardAddresses: $cardanoRewardAddresses) {
+    cardanoRewardAddress
+    registrations {
+      dustAddress
+      valid
+      nightBalance
+      generationRate
+      maxCapacity
+      currentCapacity
+      utxoTxHash
+      utxoOutputIndex
+    }
   }
 }
 `
@@ -55,6 +87,26 @@ const dustGenerationStatusResponseSchema = z
   })
   .passthrough()
 
+const dustRegistrationResponseSchema = z
+  .object({
+    dustAddress: z.string(),
+    valid: z.boolean(),
+    nightBalance: nullableStringFieldSchema,
+    generationRate: nullableStringFieldSchema,
+    maxCapacity: nullableStringFieldSchema,
+    currentCapacity: nullableStringFieldSchema,
+    utxoTxHash: nullableStringFieldSchema,
+    utxoOutputIndex: nullableStringFieldSchema,
+  })
+  .passthrough()
+
+const dustGenerationsResponseSchema = z
+  .object({
+    cardanoRewardAddress: z.string(),
+    registrations: z.array(dustRegistrationResponseSchema),
+  })
+  .passthrough()
+
 const graphqlErrorSchema = z
   .object({
     message: z.string().optional(),
@@ -67,6 +119,10 @@ const indexerResponseSchema = z
       .object({
         dustGenerationStatus: z
           .array(dustGenerationStatusResponseSchema)
+          .nullable()
+          .optional(),
+        dustGenerations: z
+          .array(dustGenerationsResponseSchema)
           .nullable()
           .optional(),
       })
@@ -213,6 +269,10 @@ export async function inspectDustGenerationStatus(
           parsedResponse.data.data?.dustGenerationStatus,
           stakeAddress,
         ),
+        registrations: selectDustRegistrations(
+          parsedResponse.data.data?.dustGenerations,
+          stakeAddress,
+        ),
       }),
       rawResponse,
       controlledError: null,
@@ -245,6 +305,100 @@ export async function inspectDustGenerationStatus(
   } finally {
     clearTimeout(timeout)
   }
+}
+
+export type DustRegistrationMatchResult = {
+  matches: string[]
+  complete: boolean
+}
+
+export async function findStakeAddressesForDustAddress(
+  candidateStakeAddresses: string[],
+  dustAddress: string,
+  options?: { fetcher?: Fetcher },
+): Promise<DustRegistrationMatchResult> {
+  const candidates = Array.from(
+    new Map(
+      candidateStakeAddresses
+        .map((address) => address.trim())
+        .filter(Boolean)
+        .map((address) => [address.toLowerCase(), address]),
+    ).values(),
+  )
+
+  if (candidates.length === 0) {
+    return { matches: [], complete: true }
+  }
+
+  const indexerConfiguration = resolveIndexerConfiguration()
+  if (!indexerConfiguration.ok) {
+    return { matches: [], complete: false }
+  }
+
+  const matches = new Map<string, string>()
+  const normalizedDustAddress = dustAddress.toLowerCase()
+
+  for (let offset = 0; offset < candidates.length; offset += 10) {
+    const chunk = candidates.slice(offset, offset + 10)
+    const abortController = new AbortController()
+    const timeout = setTimeout(
+      () => abortController.abort(),
+      INDEXER_TIMEOUT_MS,
+    )
+
+    try {
+      const response = await (options?.fetcher ?? fetch)(
+        indexerConfiguration.url,
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            ...indexerConfiguration.headers,
+          },
+          body: JSON.stringify({
+            query: DUST_REGISTRATION_MATCH_QUERY,
+            variables: { cardanoRewardAddresses: chunk },
+          }),
+          cache: "no-store",
+          signal: abortController.signal,
+        },
+      )
+
+      if (!response.ok) {
+        return { matches: Array.from(matches.values()), complete: false }
+      }
+
+      const rawResponse = await readResponseBody(response)
+      const parsedResponse = indexerResponseSchema.safeParse(rawResponse)
+      if (
+        !parsedResponse.success ||
+        (parsedResponse.data.errors?.length ?? 0) > 0
+      ) {
+        return { matches: Array.from(matches.values()), complete: false }
+      }
+
+      for (const entry of parsedResponse.data.data?.dustGenerations ?? []) {
+        if (
+          entry.registrations.some(
+            (registration) =>
+              registration.dustAddress.toLowerCase() === normalizedDustAddress,
+          )
+        ) {
+          matches.set(
+            entry.cardanoRewardAddress.toLowerCase(),
+            entry.cardanoRewardAddress,
+          )
+        }
+      }
+    } catch {
+      return { matches: Array.from(matches.values()), complete: false }
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  return { matches: Array.from(matches.values()), complete: true }
 }
 
 type IndexerConfiguration =
@@ -340,6 +494,7 @@ function toDustGenerationStatus(input: {
   checkedAt: string
   rawResponse: unknown
   response: z.infer<typeof dustGenerationStatusResponseSchema> | null
+  registrations: z.infer<typeof dustRegistrationResponseSchema>[]
 }): DustGenerationStatus {
   return {
     stakeAddress: input.stakeAddress,
@@ -351,9 +506,25 @@ function toDustGenerationStatus(input: {
     currentCapacity: input.response?.currentCapacity ?? null,
     utxoTxHash: input.response?.utxoTxHash ?? null,
     utxoOutputIndex: input.response?.utxoOutputIndex ?? null,
+    registrations: input.registrations.map(toDustRegistrationStatus),
     raw: input.rawResponse,
     source: "midnight-indexer",
     checkedAt: input.checkedAt,
+  }
+}
+
+function toDustRegistrationStatus(
+  registration: z.infer<typeof dustRegistrationResponseSchema>,
+): DustRegistrationStatus {
+  return {
+    dustAddress: registration.dustAddress,
+    valid: registration.valid,
+    nightBalance: registration.nightBalance,
+    generationRate: registration.generationRate,
+    maxCapacity: registration.maxCapacity,
+    currentCapacity: registration.currentCapacity,
+    utxoTxHash: registration.utxoTxHash,
+    utxoOutputIndex: registration.utxoOutputIndex,
   }
 }
 
@@ -376,6 +547,22 @@ function selectDustGenerationStatus(
     ) ??
     response[0] ??
     null
+  )
+}
+
+function selectDustRegistrations(
+  response: z.infer<typeof dustGenerationsResponseSchema>[] | null | undefined,
+  stakeAddress: string,
+): z.infer<typeof dustRegistrationResponseSchema>[] {
+  if (!response) {
+    return []
+  }
+
+  return (
+    response.find(
+      (entry) =>
+        entry.cardanoRewardAddress.toLowerCase() === stakeAddress.toLowerCase(),
+    )?.registrations ?? []
   )
 }
 
@@ -442,7 +629,10 @@ function getMockIndexerResult(
 
   const mockStatusByScenario: Record<
     Exclude<MockIndexerScenario, "multiple-registrations" | "indexer-error">,
-    Omit<DustGenerationStatus, "stakeAddress" | "checkedAt" | "raw">
+    Omit<
+      DustGenerationStatus,
+      "stakeAddress" | "checkedAt" | "raw" | "registrations"
+    >
   > = {
     healthy: {
       registered: true,
@@ -501,12 +691,35 @@ function getMockIndexerResult(
     },
   }
 
+  const selectedMockStatus = mockStatusByScenario[scenario]
+  const registrations: DustRegistrationStatus[] =
+    selectedMockStatus.registered && selectedMockStatus.dustAddress
+      ? [
+          {
+            dustAddress: selectedMockStatus.dustAddress,
+            valid: true,
+            nightBalance: selectedMockStatus.nightBalance,
+            generationRate: selectedMockStatus.generationRate,
+            maxCapacity: selectedMockStatus.maxCapacity,
+            currentCapacity: selectedMockStatus.currentCapacity,
+            utxoTxHash: selectedMockStatus.utxoTxHash,
+            utxoOutputIndex: selectedMockStatus.utxoOutputIndex,
+          },
+        ]
+      : []
+
   const raw = {
     data: {
       dustGenerationStatus: [
         {
           cardanoRewardAddress: stakeAddress,
-          ...mockStatusByScenario[scenario],
+          ...selectedMockStatus,
+        },
+      ],
+      dustGenerations: [
+        {
+          cardanoRewardAddress: stakeAddress,
+          registrations,
         },
       ],
     },
@@ -517,7 +730,8 @@ function getMockIndexerResult(
       stakeAddress,
       checkedAt,
       raw,
-      ...mockStatusByScenario[scenario],
+      ...selectedMockStatus,
+      registrations,
     },
     rawResponse: raw,
     controlledError: null,
