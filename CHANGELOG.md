@@ -7,6 +7,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-07
+
+### Added
+
+- Read the indexer's structured `dustGenerations` data to show every active Cardano → Midnight mapping, its validity, destination DUST address, and registration UTxO.
+- Verify Midnight-wallet reverse lookups against candidate Cardano stake addresses in batches supported by the indexer.
+- Show ambiguous Cardano source candidates explicitly instead of silently choosing one.
+- Inspect every live Cardano registration UTxO that targets the same DUST address instead of stopping at the first match.
+
+### Changed
+
+- Cross-check duplicate mappings on Cardano even when the indexer's aggregate status is not registered.
+- Explain the limits of Ledger 9, Wallet SDK 2, and DApp Connector v4 for Cardano-wallet discovery.
+
+### Fixed
+
+- Stop treating an arbitrary stake address from a registration transaction input as the linked Cardano wallet.
+- Resolve the registration credential against both transaction inputs and outputs before falling back to indexer verification.
+- Detect duplicate registrations from structured indexer records instead of depending on provider error-message wording.
+
 ## [0.7.0] - 2026-11-07
 
 ### Added
