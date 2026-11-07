@@ -21,10 +21,10 @@ describe("Midnight indexer configuration", () => {
 
     expect(result.controlledError).toBeNull()
     expect(fetcher).toHaveBeenCalledWith(
-      "https://midnight-mainnet.blockfrost.io/api/v0?project_id=secret-project-token",
+      "https://midnight-mainnet.blockfrost.io/api/v0",
       expect.objectContaining({
-        headers: expect.not.objectContaining({
-          project_id: expect.anything(),
+        headers: expect.objectContaining({
+          project_id: "secret-project-token",
         }),
       }),
     )
@@ -55,8 +55,27 @@ describe("Midnight indexer configuration", () => {
     await inspectDustGenerationStatus(stakeAddress, { fetcher })
 
     expect(fetcher).toHaveBeenCalledWith(
-      "https://midnight-mainnet.blockfrost.io/api/v0?project_id=secret-project-token",
+      "https://midnight-mainnet.blockfrost.io/api/v0",
       expect.any(Object),
+    )
+  })
+
+  test("never sends the Blockfrost token to a custom indexer", async () => {
+    vi.stubEnv("MIDNIGHT_INDEXER_URL", "https://indexer.example/graphql")
+    vi.stubEnv("MIDNIGHT_BLOCKFROST_PROJECT_ID", "secret-project-token")
+    const fetcher = vi.fn(async () =>
+      Response.json({ data: { dustGenerationStatus: [] } }),
+    )
+
+    await inspectDustGenerationStatus(stakeAddress, { fetcher })
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://indexer.example/graphql",
+      expect.objectContaining({
+        headers: expect.not.objectContaining({
+          project_id: expect.anything(),
+        }),
+      }),
     )
   })
 

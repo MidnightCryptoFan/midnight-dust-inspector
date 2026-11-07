@@ -264,7 +264,9 @@ function resolveIndexerConfiguration(): IndexerConfiguration {
   const projectId = process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID?.trim()
 
   if (configuredUrl && !isRetiredIndexerUrl(configuredUrl)) {
-    if (isBlockfrostUrl(configuredUrl) && !projectId) {
+    const usesBlockfrost = isBlockfrostUrl(configuredUrl)
+
+    if (usesBlockfrost && !projectId) {
       return {
         ok: false,
         message: "MIDNIGHT_BLOCKFROST_PROJECT_ID is not configured.",
@@ -276,18 +278,16 @@ function resolveIndexerConfiguration(): IndexerConfiguration {
 
     return {
       ok: true,
-      url: projectId
-        ? appendBlockfrostProjectId(configuredUrl, projectId)
-        : configuredUrl,
-      headers: {},
+      url: configuredUrl,
+      headers: usesBlockfrost && projectId ? { project_id: projectId } : {},
     }
   }
 
   if (projectId) {
     return {
       ok: true,
-      url: appendBlockfrostProjectId(DEFAULT_BLOCKFROST_INDEXER_URL, projectId),
-      headers: {},
+      url: DEFAULT_BLOCKFROST_INDEXER_URL,
+      headers: { project_id: projectId },
     }
   }
 
@@ -319,12 +319,6 @@ function isBlockfrostUrl(value: string): boolean {
   } catch {
     return false
   }
-}
-
-function appendBlockfrostProjectId(value: string, projectId: string): string {
-  const url = new URL(value)
-  url.searchParams.set("project_id", projectId)
-  return url.toString()
 }
 
 async function readResponseBody(response: Response): Promise<unknown> {
